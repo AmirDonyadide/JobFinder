@@ -1,4 +1,12 @@
+# Quick Start (No Coding Required)
+
 JobFinder searches job sites for you, saves matching jobs in Google Sheets, and can use AI to score each job and create tailored CV PDF links.
+
+This is the fastest way to get results: fork the project on GitHub and let GitHub
+run it for you. You never have to install anything on your own computer.
+
+> Prefer to run it from your own machine? See the [local guide](run-local.md).
+> Back to the [project overview](../README.md).
 
 ## ✅ Before You Start
 

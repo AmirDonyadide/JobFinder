@@ -2,9 +2,9 @@
 
 Use this guide when you want GitHub to run JobFinder for you.
 
-Back to the main project overview: [README.md](README.md)
+Back to the main project overview: [README.md](../README.md)
 
-Prefer running from your own machine instead? See [README.local.md](README.local.md).
+Prefer running from your own machine instead? See [the local guide](run-local.md).
 
 ## Table Of Contents
 
@@ -167,7 +167,7 @@ This value goes into the GitHub secret `GOOGLE_SPREADSHEET_ID`.
 Use the same authorized-user token for Google Sheets and Google Drive.
 
 If you do not already have `google_token.json`, follow the local setup in
-[README.local.md](README.local.md) once. Then copy the full file contents into
+[the local guide](run-local.md) once. Then copy the full file contents into
 the GitHub secret:
 
 ```text

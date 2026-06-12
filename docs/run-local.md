@@ -2,9 +2,9 @@
 
 Use this guide when you want to run JobFinder from your own machine.
 
-Back to the main project overview: [README.md](README.md)
+Back to the main project overview: [README.md](../README.md)
 
-Prefer the cloud workflow instead? See [README.github-actions.md](README.github-actions.md).
+Prefer the cloud workflow instead? See [the GitHub Actions guide](run-github-actions.md).
 
 ## Table Of Contents
 
