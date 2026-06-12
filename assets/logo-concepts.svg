@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" role="img" aria-labelledby="title description">
+  <title id="title">JobFinder logo concepts</title>
+  <desc id="description">Three logo concepts: Converge J, Shortlist Lens, and Signal Check.</desc>
+  <defs>
+    <linearGradient id="concept-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#6C63FF"/>
+      <stop offset="1" stop-color="#4C42D5"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#181A27" flood-opacity=".1"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="500" rx="28" fill="#F5F6FB"/>
+  <text x="60" y="66" fill="#181A27" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="750">JobFinder logo directions</text>
+  <text x="60" y="98" fill="#62677C" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16">Built around the project’s real behavior: collect, merge, filter, and focus.</text>
+
+  <g transform="translate(45 130)" filter="url(#shadow)">
+    <rect width="350" height="320" rx="22" fill="#fff"/>
+    <g transform="translate(127 35)">
+      <rect width="96" height="96" rx="28" fill="url(#concept-gradient)"/>
+      <path d="M27 27h42M27 43h42M27 59h42M69 27v34c0 12-8 19-20 19H37" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="36" cy="80" r="5" fill="#54E6CC"/>
+    </g>
+    <text x="175" y="168" text-anchor="middle" fill="#181A27" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="750">01 · Converge J</text>
+    <text x="175" y="202" text-anchor="middle" fill="#564BEA" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" letter-spacing="1.5">SELECTED DIRECTION</text>
+    <text x="175" y="238" text-anchor="middle" fill="#62677C" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">Job-board rows merge into a J-shaped</text>
+    <text x="175" y="262" text-anchor="middle" fill="#62677C" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">pipeline and end at one focused result.</text>
+  </g>
+
+  <g transform="translate(425 130)" filter="url(#shadow)">
+    <rect width="350" height="320" rx="22" fill="#fff"/>
+    <g transform="translate(127 35)">
+      <rect width="96" height="96" rx="28" fill="#181A27"/>
+      <rect x="23" y="18" width="43" height="57" rx="9" fill="none" stroke="#fff" stroke-width="5"/>
+      <path d="M34 32h21M34 44h16M34 56h12" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="67" cy="66" r="14" fill="#5A4FF3" stroke="#fff" stroke-width="5"/>
+      <path d="m77 77 8 8" fill="none" stroke="#54E6CC" stroke-width="5" stroke-linecap="round"/>
+    </g>
+    <text x="175" y="168" text-anchor="middle" fill="#181A27" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="750">02 · Shortlist Lens</text>
+    <text x="175" y="216" text-anchor="middle" fill="#62677C" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">A clean results sheet with one role</text>
+    <text x="175" y="240" text-anchor="middle" fill="#62677C" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">brought into focus for review.</text>
+  </g>
+
+  <g transform="translate(805 130)" filter="url(#shadow)">
+    <rect width="350" height="320" rx="22" fill="#fff"/>
+    <g transform="translate(127 35)">
+      <rect width="96" height="96" rx="28" fill="#0EAD9C"/>
+      <circle cx="25" cy="27" r="5" fill="#fff"/>
+      <circle cx="25" cy="48" r="5" fill="#fff"/>
+      <circle cx="25" cy="69" r="5" fill="#fff"/>
+      <path d="M31 27c18 0 18 21 32 21M31 48h32M31 69c18 0 18-21 32-21" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+      <path d="m58 49 8 8 15-19" fill="none" stroke="#181A27" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="175" y="168" text-anchor="middle" fill="#181A27" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="750">03 · Signal Check</text>
+    <text x="175" y="216" text-anchor="middle" fill="#62677C" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">Multiple search signals resolve into</text>
+    <text x="175" y="240" text-anchor="middle" fill="#62677C" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">one verified, relevant opportunity.</text>
+  </g>
+</svg>

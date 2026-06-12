@@ -10,6 +10,7 @@ index.html        # landing page (for users)
 developers.html   # developer guide page
 css/styles.css    # design system + components (light/dark theming)
 js/main.js        # copy buttons, tabs, FAQ, theme toggle, command builder
+assets/           # SVG logo system, concepts, and favicon
 .nojekyll         # tells GitHub Pages to serve files as-is (skip Jekyll)
 ```
 
@@ -48,3 +49,14 @@ serve the static files exactly as they are.
   `main` branch, so the site stays in sync with the repo docs.
 - Paths are relative, so the site works both locally and under the
   `/JobFinder/` GitHub Pages path.
+
+## Brand assets
+
+- [`assets/logo-mark.svg`](assets/logo-mark.svg) — primary square logo mark.
+- [`assets/logo-lockup.svg`](assets/logo-lockup.svg) — reusable logo and wordmark.
+- [`assets/favicon.svg`](assets/favicon.svg) — simplified small-size mark.
+- [`assets/logo-concepts.svg`](assets/logo-concepts.svg) — the three explored directions.
+
+The selected **Converge J** concept turns multiple job-board rows into a single
+`J`-shaped pipeline, ending at a mint shortlist point. It represents the
+project's core value: many sources become one focused set of relevant jobs.
