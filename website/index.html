@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JobFinder — Automated, multi-board job search with optional AI scoring</title>
+  <meta name="description" content="JobFinder scrapes jobs from LinkedIn, Indeed, Stepstone and Xing, removes duplicates, filters the noise, and saves results to Excel or Google Sheets — with optional OpenAI scoring and tailored CV PDFs." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235b51e8'/%3E%3Cpath d='M14 9h4v8a4 4 0 0 1-8 0' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3Ccircle cx='22' cy='12' r='3.4' fill='none' stroke='white' stroke-width='2.4'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#what">Skip to content</a>
+
+  <!-- ===== Nav ===== -->
+  <header class="nav" id="nav">
+    <div class="container nav__inner">
+      <a class="brand" href="index.html" aria-label="JobFinder home">
+        <svg class="brand__logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#5b51e8"/><path d="M14 9h4v8a4 4 0 0 1-8 0" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round"/><circle cx="22" cy="12" r="3.4" fill="none" stroke="white" stroke-width="2.4"/></svg>
+        JobFinder
+      </a>
+      <nav class="nav__links" id="navLinks" aria-label="Primary">
+        <a href="#what">Overview</a>
+        <a href="#features">Features</a>
+        <a href="#quick-start">Quick Start</a>
+        <a href="#usage">Usage</a>
+        <a href="#faq">FAQ</a>
+        <a href="developers.html">Developers</a>
+      </nav>
+      <div class="nav__actions">
+        <button class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle theme">
+          <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+        <a class="btn btn--ghost" href="https://github.com/AmirDonyadide/JobFinder" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.56-.29-5.26-1.28-5.26-5.7 0-1.26.45-2.3 1.2-3.1-.13-.3-.52-1.49.1-3.1 0 0 .97-.31 3.2 1.18a11 11 0 0 1 5.82 0c2.22-1.5 3.19-1.18 3.19-1.18.62 1.61.23 2.8.11 3.1.74.8 1.19 1.84 1.19 3.1 0 4.43-2.7 5.4-5.28 5.69.42.36.79 1.06.79 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>
+          GitHub
+        </a>
+        <button class="icon-btn nav__toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== Hero ===== -->
+  <section class="hero" id="home">
+    <div class="container hero__grid">
+      <div>
+        <span class="eyebrow">Open-source job-search automation</span>
+        <h1>Stop searching job boards <span class="grad">by hand.</span></h1>
+        <p class="hero__lead">
+          JobFinder collects fresh postings from LinkedIn, Indeed, Stepstone and Xing,
+          removes duplicates, filters out the noise, and drops everything into one
+          tidy spreadsheet — with optional AI scoring against your own CV.
+        </p>
+        <div class="hero__cta">
+          <a class="btn btn--primary" href="#quick-start">
+            Get Started
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn--ghost" href="https://github.com/AmirDonyadide/JobFinder" target="_blank" rel="noopener">View on GitHub</a>
+        </div>
+        <div class="hero__meta">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> 4 job boards, one run</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Excel or Google Sheets</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Runs on a schedule</span>
+        </div>
+      </div>
+      <div class="hero__visual">
+        <div class="terminal" role="img" aria-label="Terminal showing JobFinder install and run commands">
+          <div class="terminal__bar"><i></i><i></i><i></i><span>bash — JobFinder</span></div>
+          <div class="terminal__body">
+            <div><span class="c"># install (Python 3.14+)</span></div>
+            <div><span class="p">$</span> python -m pip install -e .</div>
+            <div><span class="c"># check your setup — no API credits used</span></div>
+            <div><span class="p">$</span> python run_job_pipeline.py --preflight</div>
+            <div><span class="o">&nbsp;&nbsp;Preflight complete. sources=all, output=google_sheets</span></div>
+            <div><span class="c"># scrape + score jobs against your CV</span></div>
+            <div><span class="p">$</span> python run_job_pipeline.py --mode scrape_and_evaluate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== What is it ===== -->
+  <section class="section" id="what">
+    <div class="container">
+      <div class="section__head reveal">
+        <span class="eyebrow">What is JobFinder?</span>
+        <h2>A repeatable pipeline for your job hunt</h2>
+        <p>
+          Searching several job boards by hand is slow and repetitive. JobFinder runs the
+          same search for you across multiple boards, keeps only what is new and relevant,
+          and (if you want) asks OpenAI to score each role against your CV and build a
+          tailored CV PDF for the good matches.
+        </p>
+      </div>
+
+      <div class="flow reveal" aria-label="Pipeline steps">
+        <div class="flow__node">
+          <div class="step">STEP 1</div>
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <strong>Scrape</strong><span>4 job boards</span>
+        </div>
+        <div class="flow__node">
+          <div class="step">STEP 2</div>
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M14 7h7M3 17h7"/></svg>
+          <strong>De-dupe</strong><span>merge matches</span>
+        </div>
+        <div class="flow__node">
+          <div class="step">STEP 3</div>
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>
+          <strong>Filter</strong><span>remove noise</span>
+        </div>
+        <div class="flow__node">
+          <div class="step">STEP 4</div>
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          <strong>Export</strong><span>Excel / Sheets</span>
+        </div>
+        <div class="flow__node opt">
+          <span class="badge-opt">OPTIONAL</span>
+          <div class="step">STEP 5</div>
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 4.6L18 9l-4.1 1.4L12 15l-1.9-4.6L6 9l4.1-1.4z"/><path d="M5 16l.9 2.1L8 19l-2.1.9L5 22l-.9-2.1L2 19l2.1-.9z"/></svg>
+          <strong>AI score</strong><span>verdict + fit</span>
+        </div>
+        <div class="flow__node opt">
+          <span class="badge-opt">OPTIONAL</span>
+          <div class="step">STEP 6</div>
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>
+          <strong>CV PDFs</strong><span>tailored per job</span>
+        </div>
+      </div>
+
+      <div class="callout callout--info reveal" style="max-width:820px;margin:34px auto 0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <p>JobFinder is configured with <strong>your own</strong> keywords, filters, prompt and CV.
+        Those private files stay on your machine or in GitHub secrets — they are never committed to the repository.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Features ===== -->
+  <section class="section section--soft" id="features">
+    <div class="container">
+      <div class="section__head reveal">
+        <span class="eyebrow">Key features</span>
+        <h2>Everything you need for a daily shortlist</h2>
+        <p>Only features that exist in the project today — nothing invented.</p>
+      </div>
+      <div class="grid grid--3">
+        <div class="card reveal">
+          <div class="card__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+          <h3>One search, four boards</h3>
+          <p>Search LinkedIn, Indeed, Stepstone and Xing in a single run, powered by Apify actors.</p>
+        </div>
+        <div class="card reveal">
+          <div class="card__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M14 7h7M3 17h7"/></svg></div>
+          <h3>No duplicates</h3>
+          <p>The same job posted on several boards is merged into one row — deterministic, with no AI involved.</p>
+        </div>
+        <div class="card reveal">
+          <div class="card__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v6h-6"/></svg></div>
+          <h3>Only new jobs</h3>
+          <p>Scheduled runs can fetch only what was posted since your last run, using your spreadsheet's history.</p>
+        </div>
+        <div class="card reveal">
+          <div class="card__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+          <h3>Excel or Google Sheets</h3>
+          <p>Export a timestamped sheet locally to Excel, to Google Sheets, or to both at once.</p>
+        </div>
+        <div class="card reveal">
+          <div class="card__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 4.6L18 9l-4.1 1.4L12 15l-1.9-4.6L6 9l4.1-1.4z"/><path d="M5 16l.9 2.1L8 19l-2.1.9L5 22l-.9-2.1L2 19l2.1-.9z"/></svg></div>
+          <h3>Optional AI scoring</h3>
+          <p>OpenAI scores each job against your CV, writing a verdict, a 0–26 fit score, and reasons it may not fit.</p>
+        </div>
+        <div class="card reveal">
+          <div class="card__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></div>
+          <h3>Tailored CV PDFs</h3>
+          <p>For promising roles it compiles a tailored LaTeX CV to PDF and links it from the sheet via Google Drive.</p>
+        </div>
+        <div class="card reveal">
+          <div class="card__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <h3>Runs on a schedule</h3>
+          <p>Let GitHub Actions run it daily with no computer on. It even resumes an unfinished same-day run.</p>
+        </div>
+        <div class="card reveal">
+          <div class="card__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h18M3 12h12M3 19h7"/></svg></div>
+          <h3>Filters you control</h3>
+          <p>Exclude titles and companies, cap applicant counts, and choose how far back to search.</p>
+        </div>
+        <div class="card reveal">
+          <div class="card__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+          <h3>Crash-safe writes</h3>
+          <p>Evaluations save row by row, so a later failure keeps everything already completed.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Quick Start ===== -->
+  <section class="section" id="quick-start">
+    <div class="container">
+      <div class="section__head reveal">
+        <span class="eyebrow">Quick start</span>
+        <h2>Two ways to run it</h2>
+        <p>Pick the path that fits you. Most people start with the no-code cloud option.</p>
+      </div>
+
+      <div style="text-align:center" class="reveal">
+        <div class="tabs__list" role="tablist" aria-label="Quick start method">
+          <button class="tabs__btn is-active" role="tab" aria-selected="true" data-tab="tab-cloud">☁️ No-code (GitHub)</button>
+          <button class="tabs__btn" role="tab" aria-selected="false" data-tab="tab-local">💻 On your machine</button>
+        </div>
+      </div>
+
+      <!-- Cloud -->
+      <div class="tabs__panel is-active" id="tab-cloud" role="tabpanel">
+        <div class="steps" style="max-width:820px;margin:0 auto;">
+          <div class="step-row reveal"><div class="step-row__num"></div><div class="step-row__body">
+            <h3>Fork the repository</h3>
+            <p>Open the project on GitHub and click <strong>Fork</strong> to make your own copy. No installation required.</p>
+          </div></div>
+          <div class="step-row reveal"><div class="step-row__num"></div><div class="step-row__body">
+            <h3>Add your secrets</h3>
+            <p>In your fork, go to <em>Settings → Secrets and variables → Actions</em> and add your Apify token, keywords, Google token, and (for AI) your OpenAI key, prompt and CV.</p>
+          </div></div>
+          <div class="step-row reveal"><div class="step-row__num"></div><div class="step-row__body">
+            <h3>Press Run</h3>
+            <p>Open <em>Actions → JobFinder Pipeline → Run workflow</em>, choose your options, and start it. It can also run automatically on a daily schedule.</p>
+          </div></div>
+          <div class="step-row reveal"><div class="step-row__num"></div><div class="step-row__body">
+            <h3>Read your results</h3>
+            <p>A new dated tab appears in your Google Sheet. In <code>scrape_and_evaluate</code> mode it also gets the AI columns and CV PDF links.</p>
+          </div></div>
+        </div>
+        <div style="text-align:center;margin-top:30px" class="reveal">
+          <a class="btn btn--primary" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/quick-start.md" target="_blank" rel="noopener">Full Quick Start guide →</a>
+        </div>
+      </div>
+
+      <!-- Local -->
+      <div class="tabs__panel" id="tab-local" role="tabpanel">
+        <div style="max-width:820px;margin:0 auto;">
+          <p style="color:var(--text-soft)">Clone the repo, install it in a Python 3.14+ environment, and create your config files from the examples:</p>
+          <div class="code">
+            <button class="copy" aria-label="Copy code">Copy</button>
+<pre><span class="c"># 1. Clone and enter the project</span>
+git clone https://github.com/AmirDonyadide/JobFinder.git
+cd JobFinder
+
+<span class="c"># 2. Install it (Python 3.14+ recommended)</span>
+python -m pip install -e .
+
+<span class="c"># 3. Create your private config from the examples</span>
+cp .env.example .env
+cp configs/keywords.example.txt configs/keywords.txt
+cp prompts/master_prompt.example.txt prompts/master_prompt.txt
+cp cv/master_cv.example.tex cv/master_cv.tex</pre>
+          </div>
+          <p style="color:var(--text-soft)">Add your <code style="background:var(--primary-soft);color:var(--primary);padding:2px 6px;border-radius:5px">APIFY_API_TOKEN</code> to <code style="background:var(--primary-soft);color:var(--primary);padding:2px 6px;border-radius:5px">.env</code>, put your search terms in <code style="background:var(--primary-soft);color:var(--primary);padding:2px 6px;border-radius:5px">configs/keywords.txt</code>, then try your first run below.</p>
+          <div style="text-align:center;margin-top:24px">
+            <a class="btn btn--primary" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/run-local.md" target="_blank" rel="noopener">Full Local guide →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Installation requirements ===== -->
+  <section class="section section--soft" id="install">
+    <div class="container">
+      <div class="section__head reveal">
+        <span class="eyebrow">Installation</span>
+        <h2>What you need</h2>
+        <p>Local Excel-only runs need just Python and an Apify token. The full pipeline adds Google and OpenAI.</p>
+      </div>
+      <div class="grid grid--2" style="max-width:920px;margin:0 auto;">
+        <div class="card reveal">
+          <h3>Always required</h3>
+          <ul style="color:var(--text-soft);padding-left:20px;margin:0;">
+            <li><strong>Python 3.14+</strong></li>
+            <li>An <strong>Apify API token</strong> (for all scraping)</li>
+          </ul>
+        </div>
+        <div class="card reveal">
+          <h3>For AI scoring &amp; the full pipeline</h3>
+          <ul style="color:var(--text-soft);padding-left:20px;margin:0;">
+            <li>An <strong>OpenAI API key</strong></li>
+            <li><strong>Google OAuth</strong> access (Sheets &amp; Drive)</li>
+            <li><strong>LaTeX</strong> (<code style="background:var(--primary-soft);color:var(--primary);padding:1px 5px;border-radius:4px">latexmk</code> + <code style="background:var(--primary-soft);color:var(--primary);padding:1px 5px;border-radius:4px">xelatex</code>) for CV PDFs</li>
+          </ul>
+        </div>
+      </div>
+      <div style="max-width:920px;margin:22px auto 0">
+        <p style="color:var(--text-soft);font-weight:600;margin-bottom:6px">Install the package (editable):</p>
+        <div class="code reveal">
+          <button class="copy" aria-label="Copy command">Copy</button>
+<pre>python -m pip install -e .</pre>
+        </div>
+        <div class="callout reveal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+          <p>Apify and OpenAI bill by usage, so a full AI run uses paid API credits. Local Excel-only scraping needs only an Apify token. See the <a href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/configuration.md#cost--performance-tuning" target="_blank" rel="noopener">cost &amp; performance notes</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Usage ===== -->
+  <section class="section" id="usage">
+    <div class="container">
+      <div class="section__head reveal">
+        <span class="eyebrow">Basic usage</span>
+        <h2>Run your first search</h2>
+        <p>The quickest thing to try needs no Google account or OpenAI key — just an Apify token.</p>
+      </div>
+
+      <div style="max-width:820px;margin:0 auto;">
+        <h3 class="reveal">Scrape to a local Excel file</h3>
+        <div class="code reveal">
+          <button class="copy" aria-label="Copy command">Copy</button>
+<pre>JOBFINDER_SCRAPER_OUTPUT_MODE=excel python linkedin_job_scraper.py</pre>
+        </div>
+        <p style="color:var(--text-soft)" class="reveal">This writes the matching jobs to <code style="background:var(--primary-soft);color:var(--primary);padding:2px 6px;border-radius:5px">jobs.xlsx</code>.</p>
+
+        <h3 class="reveal" style="margin-top:34px">Check your setup (spends nothing)</h3>
+        <div class="code reveal">
+          <button class="copy" aria-label="Copy command">Copy</button>
+<pre>python run_job_pipeline.py --preflight</pre>
+        </div>
+
+        <h3 class="reveal" style="margin-top:34px">Full run: scrape + AI scoring</h3>
+        <div class="code reveal">
+          <button class="copy" aria-label="Copy command">Copy</button>
+<pre>python run_job_pipeline.py --mode scrape_and_evaluate</pre>
+        </div>
+
+        <!-- Command builder -->
+        <h3 class="reveal" style="margin-top:44px">Build a command</h3>
+        <p style="color:var(--text-soft)" class="reveal">Choose options and copy the exact command. Every option here maps to a real setting.</p>
+        <div class="builder reveal">
+          <div class="builder__controls">
+            <div class="field">
+              <label for="bAction">What do you want to do?</label>
+              <select id="bAction">
+                <option value="excel">Scrape to Excel (local)</option>
+                <option value="sheets">Scrape to Google Sheets</option>
+                <option value="evaluate">Scrape + AI evaluation</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="bSource">Job boards</label>
+              <select id="bSource">
+                <option value="linkedin">LinkedIn</option>
+                <option value="indeed">Indeed</option>
+                <option value="stepstone">Stepstone</option>
+                <option value="xing">Xing</option>
+                <option value="all" selected>All four</option>
+              </select>
+            </div>
+          </div>
+          <div class="code" style="margin:0">
+            <button class="copy" aria-label="Copy generated command">Copy</button>
+<pre id="builderOut">JOBFINDER_SCRAPER_SOURCES=all JOBFINDER_SCRAPER_OUTPUT_MODE=excel python linkedin_job_scraper.py</pre>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin-top:30px" class="reveal">
+          <a class="btn btn--ghost" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/usage.md" target="_blank" rel="noopener">Full Usage guide →</a>
+          <a class="btn btn--ghost" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/examples.md" target="_blank" rel="noopener">More examples →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Workflows ===== -->
+  <section class="section section--soft" id="workflows">
+    <div class="container">
+      <div class="section__head reveal">
+        <span class="eyebrow">Common workflow</span>
+        <h2>What a daily run looks like</h2>
+        <p>The scheduled GitHub Actions pipeline, end to end.</p>
+      </div>
+      <div class="steps" style="max-width:780px;margin:0 auto;">
+        <div class="step-row reveal"><div class="step-row__num"></div><div class="step-row__body">
+          <h3>It wakes up on schedule</h3>
+          <p>GitHub Actions starts the pipeline in the morning, with same-day fallback runs in case the first is delayed.</p>
+        </div></div>
+        <div class="step-row reveal"><div class="step-row__num"></div><div class="step-row__body">
+          <h3>It scrapes only what's new</h3>
+          <p>Using <code>since_previous_run</code>, it fetches jobs posted after the newest entry already in your sheet.</p>
+        </div></div>
+        <div class="step-row reveal"><div class="step-row__num"></div><div class="step-row__body">
+          <h3>It de-dupes, filters and writes a tab</h3>
+          <p>Duplicates merge, excluded titles/companies drop out, and a new dated tab lands in your Google Sheet.</p>
+        </div></div>
+        <div class="step-row reveal"><div class="step-row__num"></div><div class="step-row__body">
+          <h3>It scores each job and builds CV PDFs</h3>
+          <p>OpenAI writes a verdict and a fit score; tailored CV PDFs are uploaded to Drive and linked in the sheet.</p>
+        </div></div>
+        <div class="step-row reveal"><div class="step-row__num"></div><div class="step-row__body">
+          <h3>You open the sheet and apply</h3>
+          <p>Sort by fit score, mark your application status, and move on — no manual searching required.</p>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Documentation ===== -->
+  <section class="section" id="docs">
+    <div class="container">
+      <div class="section__head reveal">
+        <span class="eyebrow">Documentation</span>
+        <h2>Go deeper</h2>
+        <p>Short, focused guides — read only what you need. All hosted in the repository.</p>
+      </div>
+      <div class="grid grid--3">
+        <a class="card card--link reveal" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/quick-start.md" target="_blank" rel="noopener">
+          <h3>🚀 Quick Start</h3>
+          <p>Fork it and run on GitHub — no coding required.</p>
+          <span class="card__more">Read guide →</span>
+        </a>
+        <a class="card card--link reveal" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/usage.md" target="_blank" rel="noopener">
+          <h3>📖 Usage guide</h3>
+          <p>Every command, run mode, and output column explained.</p>
+          <span class="card__more">Read guide →</span>
+        </a>
+        <a class="card card--link reveal" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/configuration.md" target="_blank" rel="noopener">
+          <h3>⚙️ Configuration</h3>
+          <p>Every environment variable and config file in one place.</p>
+          <span class="card__more">Read guide →</span>
+        </a>
+        <a class="card card--link reveal" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/examples.md" target="_blank" rel="noopener">
+          <h3>🧩 Examples</h3>
+          <p>Copy-paste recipes for common situations.</p>
+          <span class="card__more">Read guide →</span>
+        </a>
+        <a class="card card--link reveal" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/how-it-works.md" target="_blank" rel="noopener">
+          <h3>🔍 How it works</h3>
+          <p>The scraping, dedupe, history and evaluation flow.</p>
+          <span class="card__more">Read guide →</span>
+        </a>
+        <a class="card card--link reveal" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/troubleshooting.md" target="_blank" rel="noopener">
+          <h3>🛟 Troubleshooting</h3>
+          <p>Fixes for the most common errors.</p>
+          <span class="card__more">Read guide →</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FAQ ===== -->
+  <section class="section section--soft" id="faq">
+    <div class="container">
+      <div class="section__head reveal">
+        <span class="eyebrow">FAQ</span>
+        <h2>Common questions</h2>
+      </div>
+      <div class="accordion">
+        <div class="acc-item reveal">
+          <button class="acc-trigger" aria-expanded="false">Do I need to know how to code?
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="acc-panel"><div class="acc-panel__inner"><p>No. The recommended path is to fork the repository and run it on GitHub Actions — you only add a few secrets and press <em>Run</em>. Running locally needs basic command-line comfort but no programming.</p></div></div>
+        </div>
+        <div class="acc-item reveal">
+          <button class="acc-trigger" aria-expanded="false">Which job boards are supported?
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="acc-panel"><div class="acc-panel__inner"><p>LinkedIn, Indeed, Stepstone and Xing, via Apify actors. You can search one board, a custom list, or all four with <code>JOBFINDER_SCRAPER_SOURCES</code>.</p></div></div>
+        </div>
+        <div class="acc-item reveal">
+          <button class="acc-trigger" aria-expanded="false">Does it cost money to run?
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="acc-panel"><div class="acc-panel__inner"><p>JobFinder itself is free, but it uses third-party APIs that bill by usage. Scraping needs a paid/credited <strong>Apify</strong> account, and AI scoring needs a paid <strong>OpenAI</strong> key. A local Excel-only scrape uses only your Apify credits.</p></div></div>
+        </div>
+        <div class="acc-item reveal">
+          <button class="acc-trigger" aria-expanded="false">Can I use it without the AI part?
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="acc-panel"><div class="acc-panel__inner"><p>Yes. Run in <code>scrape_only</code> mode (or the scraper alone) to collect and filter jobs without OpenAI. The AI scoring and CV PDFs are entirely optional.</p></div></div>
+        </div>
+        <div class="acc-item reveal">
+          <button class="acc-trigger" aria-expanded="false">Where do my results end up?
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="acc-panel"><div class="acc-panel__inner"><p>In a spreadsheet. Local runs can write <code>jobs.xlsx</code>; cloud and full-pipeline runs add a new dated tab to your Google Sheet. Each run is timestamped so history is preserved.</p></div></div>
+        </div>
+        <div class="acc-item reveal">
+          <button class="acc-trigger" aria-expanded="false">Are my keywords and CV kept private?
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="acc-panel"><div class="acc-panel__inner"><p>Yes. Your keywords, prompt, CV and credentials live in local files (ignored by Git) or in GitHub secrets. The repository only ships example placeholders.</p></div></div>
+        </div>
+        <div class="acc-item reveal">
+          <button class="acc-trigger" aria-expanded="false">How do I stop the automatic scheduled runs?
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="acc-panel"><div class="acc-panel__inner"><p>In your fork, open <em>Actions → JobFinder Pipeline</em>, click the <strong>…</strong> menu, and choose <em>Disable workflow</em>. You can re-enable it any time.</p></div></div>
+        </div>
+        <div class="acc-item reveal">
+          <button class="acc-trigger" aria-expanded="false">What license is it under? Can I use it commercially?
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="acc-panel"><div class="acc-panel__inner"><p>It uses a custom <strong>non-commercial</strong> license: free to view, run, modify and share for personal, educational and other non-commercial purposes. Commercial use needs a separate written license. Read the full <a href="https://github.com/AmirDonyadide/JobFinder/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE</a> before use.</p></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CTA ===== -->
+  <section class="section">
+    <div class="container">
+      <div class="cta reveal">
+        <h2>Ready to automate your job search?</h2>
+        <p>Fork the repo, add your keywords, and let JobFinder build your shortlist.</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <a class="btn btn--primary" href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/quick-start.md" target="_blank" rel="noopener">Start the Quick Start</a>
+          <a class="btn btn--ghost" href="https://github.com/AmirDonyadide/JobFinder" target="_blank" rel="noopener">Star it on GitHub</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Footer ===== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__grid">
+        <div class="footer__brand">
+          <a class="brand" href="index.html"><svg class="brand__logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#5b51e8"/><path d="M14 9h4v8a4 4 0 0 1-8 0" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round"/><circle cx="22" cy="12" r="3.4" fill="none" stroke="white" stroke-width="2.4"/></svg> JobFinder</a>
+          <p>Automated, multi-board job search with optional AI scoring and tailored CV PDFs.</p>
+        </div>
+        <div>
+          <h4>Get started</h4>
+          <ul class="footer__links">
+            <li><a href="#quick-start">Quick Start</a></li>
+            <li><a href="#install">Installation</a></li>
+            <li><a href="#usage">Usage</a></li>
+            <li><a href="#faq">FAQ</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Documentation</h4>
+          <ul class="footer__links">
+            <li><a href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/usage.md" target="_blank" rel="noopener">Usage guide</a></li>
+            <li><a href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/configuration.md" target="_blank" rel="noopener">Configuration</a></li>
+            <li><a href="https://github.com/AmirDonyadide/JobFinder/blob/main/docs/how-it-works.md" target="_blank" rel="noopener">How it works</a></li>
+            <li><a href="developers.html">Developer guide</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Project</h4>
+          <ul class="footer__links">
+            <li><a href="https://github.com/AmirDonyadide/JobFinder" target="_blank" rel="noopener">GitHub repo</a></li>
+            <li><a href="https://github.com/AmirDonyadide/JobFinder/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a></li>
+            <li><a href="https://github.com/AmirDonyadide/JobFinder/blob/main/LICENSE" target="_blank" rel="noopener">License</a></li>
+            <li><a href="https://github.com/AmirDonyadide/JobFinder/issues" target="_blank" rel="noopener">Issues</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer__bottom">
+        <span>Built for the <a href="https://github.com/AmirDonyadide/JobFinder" target="_blank" rel="noopener">JobFinder</a> project · Non-commercial license</span>
+        <span>Not affiliated with LinkedIn, Indeed, Stepstone, Xing, Apify, OpenAI or Google.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -6,6 +6,10 @@
 [![CI](https://github.com/AmirDonyadide/JobFinder/actions/workflows/ci.yml/badge.svg)](https://github.com/AmirDonyadide/JobFinder/actions/workflows/ci.yml)
 [![License: Non-Commercial](https://img.shields.io/badge/license-Non--Commercial-orange.svg)](LICENSE)
 
+🌐 **[Project website](https://amirdonyadide.github.io/JobFinder/)** · 📚 **[Documentation](docs/)** · 🚀 **[Quick Start](docs/quick-start.md)**
+
+> The website is a static site in [`website/`](website/), published to GitHub Pages.
+
 JobFinder turns a repetitive job search into a repeatable, automated workflow. It
 collects fresh postings from **LinkedIn, Indeed, Stepstone, and Xing**, removes
 duplicates, filters out the noise, and saves the results to **Excel or Google
