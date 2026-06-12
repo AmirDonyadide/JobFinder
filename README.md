@@ -8,7 +8,7 @@
 
 🌐 **[Project website](https://amirdonyadide.github.io/JobFinder/)** · 📚 **[Documentation](docs/)** · 🚀 **[Quick Start](docs/quick-start.md)**
 
-> The website is a static site in [`website/`](website/), published to GitHub Pages.
+> The website source lives on the [`website` branch](https://github.com/AmirDonyadide/JobFinder/tree/website) and is published with GitHub Pages.
 
 JobFinder turns a repetitive job search into a repeatable, automated workflow. It
 collects fresh postings from **LinkedIn, Indeed, Stepstone, and Xing**, removes
