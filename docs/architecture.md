@@ -1,5 +1,9 @@
 # JobFinder Architecture Assessment
 
+> Audience: contributors and maintainers. For a plain-language walkthrough of a
+> run, see [How it works](how-it-works.md). Back to the
+> [project overview](../README.md).
+
 This document records the repository-wide architecture review and the current
 modularization target. The refactor keeps public CLI commands and historical
 imports working while tightening module ownership.
