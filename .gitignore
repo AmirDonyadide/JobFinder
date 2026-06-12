@@ -1,19 +1,18 @@
-# macOS
-.DS_Store
+# This orphan branch publishes only the static website. Ignore everything by
+# default so files left in the worktree after switching from `main` cannot be
+# committed or deployed accidentally.
+/*
 
-# Editor / IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+!/.gitignore
+!/.nojekyll
+!/README.md
+!/*.html
 
-# Claude Code
-.claude/
+!/css/
+!/css/**
 
-# Node (only if you add local tooling such as `npx serve`)
-node_modules/
+!/js/
+!/js/**
 
-# Secrets — should never live on the website branch (safety net)
-.env
-google_token*.json
-google_client_secret*.json
+!/assets/
+!/assets/**
