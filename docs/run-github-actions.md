@@ -114,15 +114,19 @@ It runs the pipeline on GitHub:
 
 1. Checks out the repository.
 2. Sets up Python 3.14.
-3. Installs LaTeX tools and dependencies from `requirements.txt`.
-4. Validates required GitHub secrets.
-5. Writes private keywords, prompt, CV, and Google credentials into temporary runner files.
-6. Runs a provider-access preflight.
-7. Scrapes jobs into Google Sheets.
-8. Evaluates every unevaluated row with OpenAI when `scrape_and_evaluate` is selected.
-9. Compiles generated LaTeX CVs to PDFs and uploads them to Google Drive.
-10. Uploads JSON and Markdown run reports as artifacts.
-11. Removes private runtime files from the runner.
+3. Resolves which modules are enabled for the selected manual or scheduled run.
+4. Installs base scraper dependencies, plus evaluator, Google API, and LaTeX
+   dependencies only when the selected run needs them.
+5. Validates the required GitHub secrets for the selected modules.
+6. Writes private keywords, and writes prompt/CV/photo/Google files only when
+   the selected modules need them.
+7. Runs provider and Google preflight for Google-backed pipeline runs.
+8. Scrapes jobs into the selected output destination.
+9. Evaluates every unevaluated row with OpenAI when `scrape_and_evaluate` is selected.
+10. Compiles generated LaTeX CVs to PDFs and uploads them to Google Drive only
+   when CV PDF output is enabled.
+11. Uploads JSON and Markdown run reports as artifacts.
+12. Removes private runtime files from the runner.
 
 ## 1. Push The Repository To GitHub
 
@@ -256,13 +260,13 @@ Add these secrets exactly:
 |---|---|---|
 | `APIFY_API_TOKEN` | All runs | One Apify API token, or 1 to 12 tokens separated by `;`, for example `apify_api_1;apify_api_2;apify_api_3`. |
 | `OPENAI_API_KEY` | `scrape_and_evaluate` | Your OpenAI API key, for example `sk-...` or `sk-proj-...`. |
-| `GOOGLE_SPREADSHEET_ID` | All runs | The spreadsheet ID from the Google Sheet URL. |
-| `GOOGLE_TOKEN_JSON` | All runs | The full contents of `google_token.json` for Sheets and Drive. |
-| `JOB_EVAL_CV_DRIVE_FOLDER_ID` | `scrape_and_evaluate` | The Drive folder ID for generated CV PDF run folders. |
+| `GOOGLE_SPREADSHEET_ID` | Google Sheets output or `scrape_and_evaluate` | The spreadsheet ID from the Google Sheet URL. |
+| `GOOGLE_TOKEN_JSON` | Google Sheets output or `scrape_and_evaluate` | The full contents of `google_token.json` for Sheets and Drive. |
+| `JOB_EVAL_CV_DRIVE_FOLDER_ID` | `scrape_and_evaluate` with CV PDF output enabled | The Drive folder ID for generated CV PDF run folders. |
 | `JOB_KEYWORDS_TEXT` | All runs | The full contents of `configs/keywords.txt`. |
 | `MASTER_PROMPT_TEXT` | `scrape_and_evaluate` | The full contents of `prompts/master_prompt.txt`. |
 | `MASTER_CV_TEX` | `scrape_and_evaluate` | The full contents of `cv/master_cv.tex`. |
-| `CV_PHOTO_BASE64` | Optional | Base64-encoded `cv/photo.jpg` for LaTeX PDF generation when the photo is private. |
+| `CV_PHOTO_BASE64` | Optional when CV PDF output is enabled | Base64-encoded `cv/photo.jpg` for LaTeX PDF generation when the photo is private. |
 
 ## 7. Run The Workflow Manually
 
@@ -300,7 +304,19 @@ Choose the maximum applicants per job:
 Choose the pipeline mode:
 
 - `scrape_and_evaluate`: scrape jobs, then evaluate them with OpenAI.
-- `scrape_only`: create the new scraped Google Sheet tab without OpenAI evaluation.
+- `scrape_only`: collect jobs without OpenAI evaluation.
+
+Choose the scraper output mode:
+
+- `google_sheets`: write scraped jobs to a dated Google Sheet tab.
+- `excel`: write scraped jobs to the local Excel artifact path and skip Google
+  setup. This is useful for lightweight manual scraper checks such as
+  `sources=linkedin`, `run_mode=scrape_only`, `output_mode=excel`.
+
+Choose CV PDF output:
+
+- `true`: install LaTeX during evaluating runs and upload tailored CV PDFs to Drive.
+- `false`: skip LaTeX and Drive PDF upload while still running the evaluator.
 
 Choose the unsuitable-row policy:
 
@@ -309,9 +325,9 @@ Choose the unsuitable-row policy:
 
 Click **Run workflow**.
 
-The workflow creates a new dated tab in your Google Sheet. In
-`scrape_and_evaluate` mode, it then evaluates the jobs in that tab and writes
-Drive PDF links to the `AI CV PDF` column.
+With `output_mode=google_sheets`, the workflow creates a new dated tab in your
+Google Sheet. In `scrape_and_evaluate` mode, it then evaluates the jobs in that
+tab and writes Drive PDF links to the `AI CV PDF` column when PDF output is on.
 
 ## 8. Scheduled Runs
 
@@ -341,18 +357,18 @@ To change the schedule, edit the `cron` value in `.github/workflows/jobs.yml`,
 commit the change, and push it to GitHub.
 
 Scheduled runs keep the existing defaults: all sources, `since_previous_run`,
-max applicants `50`, `scrape_and_evaluate`, and `single_label_only`. The final
-tab keeps `Not Suitable` rows only when they have exactly one unsuitable-reason
-label. Source geography is Germany-only: LinkedIn uses the Germany location and
-geo ID from `configs/filters.json`, Indeed uses `DE` / `Germany`, and Stepstone
-and Xing both use `Germany`.
+max applicants `50`, `scrape_and_evaluate`, `google_sheets`, CV PDF output on,
+and `single_label_only`. The final tab keeps `Not Suitable` rows only when they
+have exactly one unsuitable-reason label. Source geography is Germany-only:
+LinkedIn uses the Germany location and geo ID from `configs/filters.json`,
+Indeed uses `DE` / `Germany`, and Stepstone and Xing both use `Germany`.
 
 ## 9. Runtime Settings In GitHub Actions
 
 The current workflow sets these runtime values in `.github/workflows/jobs.yml`:
 
 ```yaml
-JOBFINDER_SCRAPER_OUTPUT_MODE: "google_sheets"
+JOBFINDER_SCRAPER_OUTPUT_MODE: ${{ github.event.inputs.output_mode || 'google_sheets' }}
 JOBFINDER_SCRAPER_SOURCES: ${{ github.event.inputs.sources || 'all' }}
 JOBFINDER_PIPELINE_MODE: ${{ github.event.inputs.run_mode || 'scrape_and_evaluate' }}
 JOBFINDER_PIPELINE_RESUME_INCOMPLETE: "true"
@@ -379,7 +395,7 @@ JOBFINDER_SCRAPER_POSTED_TIMEZONE: Europe/Berlin
 JOB_EVAL_OPENAI_MODEL: "gpt-5-mini"
 JOB_EVAL_CONCURRENCY: "8"
 JOB_EVAL_BATCH_SIZE: "40"
-JOB_EVAL_CV_PDF_OUTPUT: "true"
+JOB_EVAL_CV_PDF_OUTPUT: ${{ github.event.inputs.cv_pdf_output || 'true' }}
 JOB_EVAL_CV_PHOTO_FILE: cv/photo.jpg
 JOB_EVAL_CV_PDF_APPLICANT_NAME: "Amir Donyadide"
 JOB_EVAL_CV_PDF_TIMEOUT: "120"
@@ -421,6 +437,8 @@ JOB_EVAL_BATCH_SIZE: "20"
   duplicate tab.
 - `scrape_only` stops after writing scraped rows.
 - `scrape_and_evaluate` writes final AI values back to the same tab.
+- Manual Excel-only scraper runs skip Google setup and upload `jobs.xlsx` as a
+  `jobfinder-excel-output` artifact.
 - By default, the final tab keeps only one-label `Not Suitable` rows.
 - Manual workflow runs can choose `keep_all` to preserve every evaluated row.
 - The workflow uploads `jobfinder-run-reports` artifacts with JSON reports and a Markdown run summary.
@@ -434,7 +452,7 @@ Use repository files for shared, non-secret configuration:
 |---|---|
 | Search source defaults, schedule, speed, timeout, and evaluator concurrency | `.github/workflows/jobs.yml` |
 | LinkedIn and Stepstone search defaults, title exclusions, company exclusions, applicant cap, status words | `configs/filters.json` |
-| Python dependencies | `requirements.txt` |
+| Python dependencies | `requirements-scraper.txt`, `requirements-evaluator.txt`, `requirements-google.txt`, and aggregate `requirements.txt` |
 
 Use GitHub secrets for private values:
 
