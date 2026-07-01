@@ -63,6 +63,7 @@ class StepstoneActorInput:
     def as_payload(self) -> dict[str, Any]:
         """Return the JSON payload accepted by the Apify actor."""
         payload: dict[str, Any] = {
+            "includeRelatedJobs": False,
             "maxItems": self.max_items,
             "maxConcurrency": self.max_concurrency,
             "minConcurrency": min(self.min_concurrency, self.max_concurrency),
@@ -146,8 +147,8 @@ def posted_within_filter(settings: ScraperSettings) -> str:
 def build_actor_input(settings: ScraperSettings, keyword: str) -> dict[str, Any]:
     """Build the Apify actor payload for one Stepstone search."""
     actor_input = StepstoneActorInput(
-        keyword=slugify_segment(keyword) if not settings.stepstone_start_urls else "",
-        location=slugify_segment(settings.stepstone_location),
+        keyword=keyword.strip() if not settings.stepstone_start_urls else "",
+        location=normalize_location_segment(settings.stepstone_location),
         category=slugify_segment(settings.stepstone_category),
         start_urls=tuple(settings.stepstone_start_urls),
         posted_within=posted_within_filter(settings),
@@ -181,7 +182,11 @@ def run_actor_search(
 
 def normalize_actor_output(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Normalize all actor items into the scraper's stable raw-job contract."""
-    return [normalize_actor_item(item) for item in items if isinstance(item, dict)]
+    return provider_normalization.normalize_actor_items(
+        items,
+        normalize_actor_item,
+        provider="Stepstone",
+    )
 
 
 def normalize_actor_item(item: dict[str, Any]) -> dict[str, Any]:
@@ -233,6 +238,19 @@ def slugify_segment(value: str) -> str:
     """Prepare a user setting for Stepstone URL path segments."""
     text = WHITESPACE_RE.sub("-", (value or "").strip().casefold())
     return quote(text, safe="-_")
+
+
+def normalize_location_segment(value: str) -> str:
+    """Return the Stepstone path segment for a user-facing location."""
+    normalized = (value or "").strip().casefold()
+    country_aliases = {
+        "germany": "deutschland",
+        "de": "deutschland",
+        "austria": "oesterreich",
+        "österreich": "oesterreich",
+        "at": "oesterreich",
+    }
+    return slugify_segment(country_aliases.get(normalized, value))
 
 
 def absolute_stepstone_url(value: str) -> str:
@@ -364,8 +382,16 @@ def format_salary(item: dict[str, Any]) -> str:
 
 def classify_work_mode(item: dict[str, Any]) -> str:
     """Classify Stepstone work-from-home hints conservatively."""
+    work_from_home = first_text(item, "workFromHome")
+    if work_from_home == "2":
+        return "Remote"
+    if work_from_home == "1":
+        return "Hybrid"
+    if work_from_home == "0":
+        return "On-site"
+
     values = [
-        first_text(item, "workFromHome"),
+        work_from_home,
         first_text(item, "location"),
         first_text(item, "title"),
         first_text(item, "textSnippet"),
@@ -376,7 +402,7 @@ def classify_work_mode(item: dict[str, Any]) -> str:
         return "Hybrid"
     if any(word in text for word in REMOTE_WORDS):
         return "Remote"
-    if first_text(item, "workFromHome") not in {"", "0", "false", "False"}:
+    if work_from_home not in {"", "0", "false", "False"}:
         return "Work from home available"
     if any(word in text for word in ONSITE_WORDS):
         return "On-site"

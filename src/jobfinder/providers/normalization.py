@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import re
+from collections.abc import Callable
 from typing import Any
+
+LOGGER = logging.getLogger("jobfinder.scraper")
 
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 WHITESPACE_RE = re.compile(r"\s+")
@@ -164,3 +168,51 @@ def append_metadata_block(
     if description:
         return f"{description}\n\n{metadata_text}"
     return metadata_text
+
+
+def normalize_actor_items(
+    items: list[Any],
+    normalizer: Callable[[dict[str, Any]], dict[str, Any]],
+    *,
+    provider: str,
+) -> list[dict[str, Any]]:
+    """Normalize actor rows while reporting malformed or unparseable items."""
+    normalized: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            LOGGER.warning(
+                "%s parser skipped dataset item %s: expected an object, got %s.",
+                provider,
+                index,
+                type(item).__name__,
+            )
+            continue
+        try:
+            parsed = normalizer(item)
+        except Exception:
+            LOGGER.exception(
+                "%s parser failed for dataset item %s; raw keys=%s.",
+                provider,
+                index,
+                sorted(item),
+            )
+            continue
+        if not parsed:
+            LOGGER.warning(
+                "%s parser skipped dataset item %s because it normalized to an "
+                "empty object; raw keys=%s.",
+                provider,
+                index,
+                sorted(item),
+            )
+            continue
+        normalized.append(parsed)
+
+    if len(normalized) != len(items):
+        LOGGER.warning(
+            "%s parser produced %s job(s) from %s dataset item(s).",
+            provider,
+            len(normalized),
+            len(items),
+        )
+    return normalized

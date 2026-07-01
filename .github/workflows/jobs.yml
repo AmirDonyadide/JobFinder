@@ -191,7 +191,7 @@ jobs:
       JOBFINDER_SCRAPER_MAX_APPLICANTS: ${{ github.event.inputs.max_applicants == 'no_limit' && '0' || github.event.inputs.max_applicants || '50' }}
       JOBFINDER_SCRAPER_SEARCH_CONCURRENCY: "15"
       JOBFINDER_SCRAPER_SEARCH_WINDOW_BUFFER_SECONDS: "3600"
-      APIFY_RUN_MEMORY_MB: "512"
+      APIFY_RUN_MEMORY_MB: "0"
       APIFY_RUN_TIMEOUT_SECONDS: "3600"
       APIFY_CLIENT_TIMEOUT_SECONDS: "120"
       APIFY_TRANSIENT_ERROR_RETRIES: "5"
@@ -207,7 +207,7 @@ jobs:
       STEPSTONE_MAX_CONCURRENCY: "10"
       STEPSTONE_MAX_REQUEST_RETRIES: "3"
       XING_LOCATION: "Germany"
-      XING_DISCIPLINE: ""
+      XING_DATE_POSTED: ""
       XING_MAX_PAGES: "20"
       XING_MAX_CONCURRENCY: "5"
       JOBFINDER_SCRAPER_TIMEZONE: Europe/Berlin
@@ -463,7 +463,11 @@ jobs:
           echo "Posted timezone: ${JOBFINDER_SCRAPER_POSTED_TIMEZONE}"
           echo "Search concurrency: ${JOBFINDER_SCRAPER_SEARCH_CONCURRENCY}"
           echo "Search window buffer: ${JOBFINDER_SCRAPER_SEARCH_WINDOW_BUFFER_SECONDS}s"
-          echo "Apify child run memory: ${APIFY_RUN_MEMORY_MB} MB"
+          if [ "${APIFY_RUN_MEMORY_MB}" = "0" ]; then
+            echo "Apify child run memory: actor default"
+          else
+            echo "Apify child run memory override: ${APIFY_RUN_MEMORY_MB} MB"
+          fi
           echo "Apify child run timeout: ${APIFY_RUN_TIMEOUT_SECONDS}s"
           echo "Apify HTTP request timeout: ${APIFY_CLIENT_TIMEOUT_SECONDS}s"
           echo "Apify transient error retries: ${APIFY_TRANSIENT_ERROR_RETRIES}"

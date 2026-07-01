@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from jobfinder.scraper.normalize import get_applicant_count, get_company, get_title
 from jobfinder.scraper.settings import ScraperSettings
+
+LOGGER = logging.getLogger("jobfinder.scraper")
 
 
 def normalize_filter_text(value: str) -> str:
@@ -38,7 +41,16 @@ def filter_excluded_titles(
     settings: ScraperSettings, jobs: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], int]:
     """Remove jobs whose titles contain configured excluded terms."""
-    filtered_jobs = [job for job in jobs if not has_excluded_title(settings, job)]
+    filtered_jobs = []
+    for job in jobs:
+        if has_excluded_title(settings, job):
+            LOGGER.debug(
+                "Skipping job %r at %r: title matched an excluded term.",
+                get_title(job),
+                get_company(job),
+            )
+            continue
+        filtered_jobs.append(job)
     return filtered_jobs, len(jobs) - len(filtered_jobs)
 
 
@@ -51,7 +63,16 @@ def filter_excluded_companies(
     settings: ScraperSettings, jobs: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], int]:
     """Remove jobs whose company names contain configured excluded terms."""
-    filtered_jobs = [job for job in jobs if not has_excluded_company(settings, job)]
+    filtered_jobs = []
+    for job in jobs:
+        if has_excluded_company(settings, job):
+            LOGGER.debug(
+                "Skipping job %r at %r: company matched an excluded term.",
+                get_title(job),
+                get_company(job),
+            )
+            continue
+        filtered_jobs.append(job)
     return filtered_jobs, len(jobs) - len(filtered_jobs)
 
 
@@ -68,5 +89,16 @@ def filter_applicant_count(
     settings: ScraperSettings, jobs: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], int]:
     """Remove jobs whose applicant count exceeds the configured cap."""
-    filtered_jobs = [job for job in jobs if not has_too_many_applicants(settings, job)]
+    filtered_jobs = []
+    for job in jobs:
+        if has_too_many_applicants(settings, job):
+            LOGGER.debug(
+                "Skipping job %r at %r: applicant count %s exceeds %s.",
+                get_title(job),
+                get_company(job),
+                get_applicant_count(job),
+                settings.max_applicants,
+            )
+            continue
+        filtered_jobs.append(job)
     return filtered_jobs, len(jobs) - len(filtered_jobs)

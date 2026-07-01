@@ -47,8 +47,8 @@ def sample_actor_item() -> dict[str, Any]:
         "description": {"text": "Build dashboards with Python and SQL."},
         "datePublished": "2026-05-12T10:00:00Z",
         "baseSalary": {
-            "minValue": 75000,
-            "maxValue": "95000",
+            "min": 75000,
+            "max": "95000",
             "currencyCode": "EUR",
             "unitOfWork": "YEAR",
         },

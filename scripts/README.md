@@ -34,6 +34,7 @@ python -m pip install -e .
 | `run_pipeline.py` | `jobfinder.pipeline.cli:main` | Scrape to Google Sheets, then optionally evaluate. |
 | `scrape_jobs.py` | `jobfinder.scraper.cli:main` | Scrape only to Excel, Google Sheets, or both. |
 | `evaluate_jobs.py` | `jobfinder.evaluator.cli:main` | Evaluate an existing Excel workbook or Google Sheet tab. |
+| `test_*_scraper.py` | `jobfinder.scraper.smoke:main` | Run one live actor and inspect raw rows before pipeline filters. |
 
 Each script prepends the repository `src` directory to `sys.path`, so it can run
 without an editable package install as long as dependencies are installed.
@@ -45,6 +46,10 @@ python scripts/run_pipeline.py --preflight
 python scripts/run_pipeline.py --mode scrape_only
 python scripts/scrape_jobs.py
 python scripts/evaluate_jobs.py --source google_sheets --sheet latest
+python scripts/test_linkedin_scraper.py
+python scripts/test_indeed_scraper.py
+python scripts/test_stepstone_scraper.py
+python scripts/test_xing_scraper.py
 ```
 
 ## Use This For Your Own Project

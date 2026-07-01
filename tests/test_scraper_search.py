@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 import requests
 
-from jobfinder.scraper.providers.apify_client import retry_delay_seconds
+from jobfinder.providers.apify_client import json_for_log, retry_delay_seconds
 from jobfinder.scraper.search import (
     ApifyConfigurationError,
     ApifyRunTimeoutError,
@@ -74,14 +74,11 @@ def make_settings() -> SimpleNamespace:
         stepstone_proxy_groups=["RESIDENTIAL"],
         stepstone_start_urls=[],
         xing_location="Germany",
-        xing_discipline="",
-        xing_remote="",
+        xing_date_posted="",
         xing_start_url="",
         xing_max_results_per_search=500,
         xing_max_pages=20,
         xing_max_concurrency=5,
-        xing_use_apify_proxy=True,
-        xing_proxy_groups=["RESIDENTIAL"],
         source_actor_ids={
             "linkedin": "linkedin~actor",
             "indeed": "indeed~actor",
@@ -145,7 +142,7 @@ def test_run_actor_uses_async_api_and_fetches_dataset(monkeypatch):
     assert jobs == [{"title": "GIS Analyst"}]
     assert calls[0] == (
         "POST",
-        "https://api.apify.com/v2/acts/owner~actor/runs",
+        "https://api.apify.com/v2/actors/owner~actor/runs",
         {"timeout": 3600, "memory": 512, "maxItems": 500},
     )
     assert calls[2] == (
@@ -154,6 +151,58 @@ def test_run_actor_uses_async_api_and_fetches_dataset(monkeypatch):
         (("format", "json"), ("limit", 500)),
     )
     assert apify_http_timeout(settings) == 120
+
+
+def test_run_actor_omits_memory_when_using_actor_default(monkeypatch):
+    """Mixed providers should be able to retain their own memory configuration."""
+    settings = make_settings()
+    settings.apify_run_memory_mb = 0
+    post_params = None
+
+    def fake_post(url: str, **kwargs: Any) -> FakeResponse:
+        nonlocal post_params
+        post_params = kwargs.get("params")
+        return FakeResponse({"data": {"id": "run-1", "defaultDatasetId": "data-1"}})
+
+    def fake_get(url: str, **kwargs: Any) -> FakeResponse:
+        if "/actor-runs/" in url:
+            return FakeResponse(
+                {
+                    "data": {
+                        "id": "run-1",
+                        "status": "SUCCEEDED",
+                        "defaultDatasetId": "data-1",
+                    }
+                }
+            )
+        return FakeResponse([])
+
+    monkeypatch.setattr(
+        "jobfinder.scraper.providers.apify_client.requests.post", fake_post
+    )
+    monkeypatch.setattr(
+        "jobfinder.scraper.providers.apify_client.requests.get", fake_get
+    )
+
+    run_actor(settings, "owner~actor", {"input": True}, 10)
+
+    assert post_params == {"timeout": 3600, "maxItems": 10}
+
+
+def test_apify_diagnostic_json_redacts_secrets():
+    """Payload logging must never expose tokens, cookies, or token query values."""
+    logged = json_for_log(
+        {
+            "token": "apify_api_secret",
+            "nested": {"cookie": "session=secret"},
+            "url": "https://example.test/?token=secret&query=GIS",
+        }
+    )
+
+    assert "apify_api_secret" not in logged
+    assert "session=secret" not in logged
+    assert "token=secret" not in logged
+    assert logged.count("<redacted>") == 3
 
 
 def test_run_actor_reports_apify_timed_out_status(monkeypatch):

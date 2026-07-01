@@ -87,8 +87,7 @@ Adapters map this to each actor's supported filter surface:
 
 - Indeed supports fixed day buckets `1`, `3`, `7`, and `14`.
 - Stepstone supports fixed day buckets `1`, `3`, and `7`.
-- Xing has no provider posted-time input in JobFinder, so filtering happens
-  after scraping when `date_posted` is present.
+- Xing supports `LAST_24_HOURS`, `LAST_WEEK`, and `LAST_MONTH`.
 - Larger windows omit or relax provider date filters and rely on post-scrape
   filtering where possible.
 
@@ -116,7 +115,7 @@ than code:
 | LinkedIn geography | `configs/filters.json` `linkedin_search.location` and `geo_id`. |
 | Indeed geography | `INDEED_COUNTRY` and `INDEED_LOCATION`. |
 | Stepstone geography or direct URL mode | `STEPSTONE_LOCATION` or `STEPSTONE_START_URLS`. |
-| Xing geography or direct URL mode | `XING_LOCATION`, `XING_DISCIPLINE`, `XING_REMOTE`, or `XING_START_URL`. |
+| Xing geography or direct URL mode | `XING_LOCATION`, `XING_DATE_POSTED`, or `XING_START_URL`. |
 | Apify cost and speed | Per-source max-results and concurrency settings. |
 
 Only add or edit adapter code when a provider actor schema changes, a new
