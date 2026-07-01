@@ -24,6 +24,10 @@ from jobfinder.providers.apify_client import (
     run_actor,
 )
 from jobfinder.providers.registry import provider_adapter
+from jobfinder.scraper.keyword_uniqueness import (
+    KeywordSearchResult,
+    log_keyword_uniqueness_summary,
+)
 from jobfinder.scraper.settings import (
     SOURCE_ALIASES,
     SOURCE_ORDER,
@@ -529,6 +533,7 @@ def run_all_searches(
 ]:
     """Run searches concurrently while preserving the original result order."""
     all_results: list[tuple[int, str, list[dict[str, Any]]]] = []
+    uniqueness_results: list[tuple[int, KeywordSearchResult]] = []
     zero_searches: list[str] = []
     failed_sources: dict[str, str] = {}
     skipped_searches: list[str] = []
@@ -637,6 +642,17 @@ def run_all_searches(
                     for idx, keyword, jobs in batch_results:
                         search = search_by_index[idx]
                         all_results.append((idx, keyword, jobs))
+                        uniqueness_results.append(
+                            (
+                                idx,
+                                KeywordSearchResult(
+                                    provider=search.provider,
+                                    provider_label=search.provider_label,
+                                    keyword=keyword,
+                                    jobs=jobs,
+                                ),
+                            )
+                        )
                         if jobs:
                             LOGGER.info(
                                 "Completed %s: %s job(s) found.",
@@ -651,6 +667,16 @@ def run_all_searches(
 
                 submit_next(executor, in_flight)
                 break
+
+    ordered_uniqueness_results = [
+        result for _, result in sorted(uniqueness_results, key=lambda item: item[0])
+    ]
+    try:
+        log_keyword_uniqueness_summary(ordered_uniqueness_results, logger=LOGGER)
+    except Exception:
+        LOGGER.exception(
+            "Could not build keyword uniqueness summary; continuing scrape."
+        )
 
     ordered_results = [
         (keyword, jobs)

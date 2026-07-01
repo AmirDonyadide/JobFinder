@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from types import SimpleNamespace
@@ -511,6 +512,71 @@ def test_run_all_searches_batches_linkedin_when_results_are_attributable(monkeyp
     assert zero_searches == []
     assert failed_sources == {}
     assert skipped_searches == []
+
+
+def test_run_all_searches_logs_keyword_uniqueness_summary(monkeypatch, caplog):
+    """Completed searches should log per-platform keyword uniqueness counts."""
+    settings = make_settings()
+    caplog.set_level(logging.INFO, logger="jobfinder.scraper")
+
+    def fake_run_actor(settings, actor_id, payload, max_items):
+        keyword = payload["keyword"]
+        if keyword == "geodaten":
+            return [
+                {
+                    "title": "GIS Analyst",
+                    "companyName": "GeoCo GmbH",
+                    "location": "Berlin, Germany",
+                },
+                {
+                    "title": "Remote Sensing Specialist",
+                    "companyName": "MapCo",
+                    "location": "Hamburg, Germany",
+                },
+            ]
+        return [
+            {
+                "title": "GIS Analyst (m/f/d)",
+                "companyName": "GeoCo",
+                "location": "Berlin",
+            }
+        ]
+
+    monkeypatch.setattr("jobfinder.scraper.search.run_actor", fake_run_actor)
+
+    run_all_searches(
+        settings,
+        [
+            SearchRequest(
+                source="linkedin",
+                source_label="LinkedIn",
+                keyword="geodaten",
+                display_label="LinkedIn / geodaten",
+                actor_id="curious_coder~linkedin-jobs-scraper",
+                payload={"keyword": "geodaten"},
+                max_items=500,
+            ),
+            SearchRequest(
+                source="linkedin",
+                source_label="LinkedIn",
+                keyword="gis",
+                display_label="LinkedIn / gis",
+                actor_id="curious_coder~linkedin-jobs-scraper",
+                payload={"keyword": "gis"},
+                max_items=500,
+            ),
+        ],
+    )
+
+    assert "Keyword uniqueness summary:" in caplog.text
+    assert (
+        "- LinkedIn / geodaten: 2 total, 1 duplicated with other keywords, "
+        "1 unique only to this keyword (50.0% unique)"
+    ) in caplog.text
+    assert (
+        "- LinkedIn / gis: 1 total, 1 duplicated with other keywords, "
+        "0 unique only to this keyword (0.0% unique)"
+    ) in caplog.text
 
 
 def test_run_all_searches_respects_indeed_source_concurrency(monkeypatch):

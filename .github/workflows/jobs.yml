@@ -42,6 +42,22 @@ on:
         options:
           - scrape_and_evaluate
           - scrape_only
+      output_mode:
+        description: "Scraper output destination"
+        required: true
+        default: "google_sheets"
+        type: choice
+        options:
+          - google_sheets
+          - excel
+      cv_pdf_output:
+        description: "Generate tailored CV PDFs during evaluation"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
       unsuitable_rows:
         description: "Not-suitable rows in the final output"
         required: true
@@ -183,7 +199,7 @@ jobs:
       MASTER_PROMPT_TEXT: ${{ secrets.MASTER_PROMPT_TEXT }}
       MASTER_CV_TEX: ${{ secrets.MASTER_CV_TEX }}
       CV_PHOTO_BASE64: ${{ secrets.CV_PHOTO_BASE64 }}
-      JOBFINDER_SCRAPER_OUTPUT_MODE: "google_sheets"
+      JOBFINDER_SCRAPER_OUTPUT_MODE: ${{ github.event.inputs.output_mode || 'google_sheets' }}
       JOBFINDER_SCRAPER_SOURCES: ${{ github.event.inputs.sources || 'all' }}
       JOBFINDER_PIPELINE_MODE: ${{ github.event.inputs.run_mode || 'scrape_and_evaluate' }}
       JOBFINDER_PIPELINE_RESUME_INCOMPLETE: "true"
@@ -216,7 +232,7 @@ jobs:
       JOB_EVAL_CONCURRENCY: "8"
       JOB_EVAL_BATCH_SIZE: "40"
       JOB_EVAL_CV_PHOTO_FILE: cv/photo.jpg
-      JOB_EVAL_CV_PDF_OUTPUT: "true"
+      JOB_EVAL_CV_PDF_OUTPUT: ${{ github.event.inputs.cv_pdf_output || 'true' }}
       JOB_EVAL_CV_PDF_APPLICANT_NAME: "Amir Donyadide"
       JOB_EVAL_CV_PDF_TIMEOUT: "120"
       JOB_EVAL_LARGE_QUEUE_THRESHOLD: "200"
@@ -237,18 +253,79 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: |
+            requirements-scraper.txt
+            requirements-evaluator.txt
+            requirements-google.txt
+            requirements.txt
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
+      - name: Resolve workflow plan
+        id: workflow_plan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          should_evaluate=false
+          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ]; then
+            should_evaluate=true
+          fi
+
+          needs_google=false
+          if [ "${should_evaluate}" = "true" ] || [ "${JOBFINDER_SCRAPER_OUTPUT_MODE}" = "google_sheets" ]; then
+            needs_google=true
+          fi
+
+          needs_latex=false
+          if [ "${should_evaluate}" = "true" ] && [ "${JOB_EVAL_CV_PDF_OUTPUT}" = "true" ]; then
+            needs_latex=true
+          fi
+
+          direct_scraper=false
+          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_only" ] && [ "${JOBFINDER_SCRAPER_OUTPUT_MODE}" = "excel" ]; then
+            direct_scraper=true
+          fi
+
+          echo "should_evaluate=${should_evaluate}" >> "${GITHUB_OUTPUT}"
+          echo "needs_google=${needs_google}" >> "${GITHUB_OUTPUT}"
+          echo "needs_latex=${needs_latex}" >> "${GITHUB_OUTPUT}"
+          echo "direct_scraper=${direct_scraper}" >> "${GITHUB_OUTPUT}"
+
+          echo "Workflow plan:"
+          echo "- pipeline mode: ${JOBFINDER_PIPELINE_MODE}"
+          echo "- scraper output mode: ${JOBFINDER_SCRAPER_OUTPUT_MODE}"
+          echo "- evaluator enabled: ${should_evaluate}"
+          echo "- Google Sheets/Drive setup needed: ${needs_google}"
+          echo "- LaTeX setup needed: ${needs_latex}"
+          echo "- direct scraper CLI: ${direct_scraper}"
+          echo "- selected sources: ${JOBFINDER_SCRAPER_SOURCES}"
+
+          for source in linkedin indeed stepstone xing; do
+            if [ "${JOBFINDER_SCRAPER_SOURCES}" = "all" ] || [ "${JOBFINDER_SCRAPER_SOURCES}" = "${source}" ]; then
+              echo "- ${source}: enabled"
+            else
+              echo "- ${source}: skipped"
+            fi
+          done
+
+      - name: Install scraper dependencies
+        run: python -m pip install -r requirements-scraper.txt
+
+      - name: Install evaluator dependencies
+        if: steps.workflow_plan.outputs.should_evaluate == 'true'
+        run: python -m pip install -r requirements-evaluator.txt
+
+      - name: Install Google API dependencies
+        if: steps.workflow_plan.outputs.needs_google == 'true'
+        run: python -m pip install -r requirements-google.txt
+
       - name: Install LaTeX tools
+        if: steps.workflow_plan.outputs.needs_latex == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y latexmk texlive-xetex texlive-latex-extra
-
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt
 
       - name: Validate required secrets
         shell: bash
@@ -283,9 +360,33 @@ jobs:
             missing=1
           fi
 
-          should_evaluate=1
-          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_only" ]; then
-            should_evaluate=0
+          should_evaluate=0
+          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ]; then
+            should_evaluate=1
+          elif [ "${JOBFINDER_PIPELINE_MODE}" != "scrape_only" ]; then
+            echo "::error::Unsupported JOBFINDER_PIPELINE_MODE '${JOBFINDER_PIPELINE_MODE}'."
+            missing=1
+          fi
+
+          needs_google=0
+          if [ "$should_evaluate" -eq 1 ] || [ "${JOBFINDER_SCRAPER_OUTPUT_MODE}" = "google_sheets" ]; then
+            needs_google=1
+          elif [ "${JOBFINDER_SCRAPER_OUTPUT_MODE}" != "excel" ]; then
+            echo "::error::Unsupported JOBFINDER_SCRAPER_OUTPUT_MODE '${JOBFINDER_SCRAPER_OUTPUT_MODE}'."
+            missing=1
+          fi
+
+          needs_pdf=0
+          if [ "$should_evaluate" -eq 1 ] && [ "${JOB_EVAL_CV_PDF_OUTPUT}" = "true" ]; then
+            needs_pdf=1
+          elif [ "${JOB_EVAL_CV_PDF_OUTPUT}" != "true" ] && [ "${JOB_EVAL_CV_PDF_OUTPUT}" != "false" ]; then
+            echo "::error::JOB_EVAL_CV_PDF_OUTPUT must be true or false."
+            missing=1
+          fi
+
+          if [ "$should_evaluate" -eq 1 ] && [ "${JOBFINDER_SCRAPER_OUTPUT_MODE}" != "google_sheets" ]; then
+            echo "::error::scrape_and_evaluate requires output_mode=google_sheets because the evaluator resumes from the Google Sheet tab."
+            missing=1
           fi
 
           if [ "$should_evaluate" -eq 1 ] && [ -z "${OPENAI_API_KEY}" ]; then
@@ -294,17 +395,17 @@ jobs:
           fi
 
           google_token_json="${GOOGLE_TOKEN_JSON:-${GOOGLE_DRIVE_TOKEN_JSON:-}}"
-          if [ -z "${google_token_json}" ]; then
+          if [ "$needs_google" -eq 1 ] && [ -z "${google_token_json}" ]; then
             echo "::error::Missing repository secret GOOGLE_TOKEN_JSON. Paste the full authorized-user token JSON from google_token.json into this secret."
             missing=1
           fi
 
-          if [ -z "${GOOGLE_SPREADSHEET_ID}" ]; then
+          if [ "$needs_google" -eq 1 ] && [ -z "${GOOGLE_SPREADSHEET_ID}" ]; then
             echo "::error::Missing repository secret GOOGLE_SPREADSHEET_ID. GitHub Actions runners are temporary, so the spreadsheet ID must be saved as a secret."
             missing=1
           fi
 
-          if [ "$should_evaluate" -eq 1 ] && [ -z "${JOB_EVAL_CV_DRIVE_FOLDER_ID}" ]; then
+          if [ "$needs_pdf" -eq 1 ] && [ -z "${JOB_EVAL_CV_DRIVE_FOLDER_ID}" ]; then
             echo "::error::Missing repository secret JOB_EVAL_CV_DRIVE_FOLDER_ID. Use the ID of the Drive folder that should contain generated CV PDFs."
             missing=1
           fi
@@ -343,7 +444,13 @@ jobs:
               Path("configs/keywords.txt"): os.environ["JOB_KEYWORDS_TEXT"],
           }
 
-          if os.environ["JOBFINDER_PIPELINE_MODE"] != "scrape_only":
+          should_evaluate = os.environ["JOBFINDER_PIPELINE_MODE"] == "scrape_and_evaluate"
+          should_generate_pdfs = (
+              should_evaluate
+              and os.environ.get("JOB_EVAL_CV_PDF_OUTPUT", "true").lower() == "true"
+          )
+
+          if should_evaluate:
               private_files.update(
                   {
                       Path("prompts/master_prompt.txt"): os.environ["MASTER_PROMPT_TEXT"],
@@ -356,7 +463,7 @@ jobs:
               path.write_text(value.strip() + "\n", encoding="utf-8")
 
           photo_base64 = "".join(os.environ.get("CV_PHOTO_BASE64", "").split())
-          if photo_base64 and os.environ["JOBFINDER_PIPELINE_MODE"] != "scrape_only":
+          if photo_base64 and should_generate_pdfs:
               try:
                   photo_bytes = base64.b64decode(photo_base64, validate=True)
               except binascii.Error as exc:
@@ -367,6 +474,7 @@ jobs:
           PY
 
       - name: Write Google credential files
+        if: steps.workflow_plan.outputs.needs_google == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -436,13 +544,14 @@ jobs:
             chmod 600 google_spreadsheet_id.txt
           fi
 
-      - name: Preflight provider access
+      - name: Preflight provider and Google access
+        if: steps.workflow_plan.outputs.direct_scraper != 'true'
         shell: bash
         run: |
           set -euo pipefail
           python -u run_job_pipeline.py --mode "${JOBFINDER_PIPELINE_MODE}" --preflight
 
-      - name: Run selected JobFinder pipeline
+      - name: Run selected JobFinder workflow
         shell: bash
         run: |
           set -o pipefail
@@ -472,22 +581,39 @@ jobs:
           echo "Apify HTTP request timeout: ${APIFY_CLIENT_TIMEOUT_SECONDS}s"
           echo "Apify transient error retries: ${APIFY_TRANSIENT_ERROR_RETRIES}"
           echo "Apify retry base delay: ${APIFY_RETRY_DELAY_SECONDS}s"
-          echo "Evaluator model: ${JOB_EVAL_OPENAI_MODEL}"
-          echo "Evaluator concurrency: ${JOB_EVAL_CONCURRENCY}"
+          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ]; then
+            echo "Evaluator: enabled"
+            echo "Evaluator model: ${JOB_EVAL_OPENAI_MODEL}"
+            echo "Evaluator concurrency: ${JOB_EVAL_CONCURRENCY}"
+            echo "CV PDF output: ${JOB_EVAL_CV_PDF_OUTPUT}"
+          else
+            echo "Evaluator: skipped"
+            echo "CV PDF output: skipped"
+          fi
           echo "Unsuitable row policy: ${JOB_EVAL_UNSUITABLE_ROW_POLICY}"
 
-          python -u run_job_pipeline.py --mode "${JOBFINDER_PIPELINE_MODE}" 2>&1 | tee pipeline.log
-          status=${PIPESTATUS[0]}
+          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_only" ] && [ "${JOBFINDER_SCRAPER_OUTPUT_MODE}" = "excel" ]; then
+            echo "Running direct scraper CLI for Excel output."
+            python -u scripts/scrape_jobs.py 2>&1 | tee pipeline.log
+            status=${PIPESTATUS[0]}
+          else
+            echo "Running pipeline CLI."
+            python -u run_job_pipeline.py --mode "${JOBFINDER_PIPELINE_MODE}" 2>&1 | tee pipeline.log
+            status=${PIPESTATUS[0]}
+          fi
 
           {
             echo "# JobFinder Run Summary"
             echo
             echo "- Status: $([ "$status" -eq 0 ] && echo succeeded || echo failed)"
             echo "- Pipeline mode: ${JOBFINDER_PIPELINE_MODE}"
+            echo "- Scraper output mode: ${JOBFINDER_SCRAPER_OUTPUT_MODE}"
             echo "- Resume incomplete evaluation: ${JOBFINDER_PIPELINE_RESUME_INCOMPLETE}"
             echo "- Job sources: ${JOBFINDER_SCRAPER_SOURCES}"
             echo "- Posted-time window: ${JOBFINDER_SCRAPER_POSTED_TIME_WINDOW}"
             echo "- Max applicants/job: $([ "${JOBFINDER_SCRAPER_MAX_APPLICANTS}" = "0" ] && echo "no limit" || echo "${JOBFINDER_SCRAPER_MAX_APPLICANTS}")"
+            echo "- Evaluator: $([ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ] && echo enabled || echo skipped)"
+            echo "- CV PDF output: $([ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ] && echo "${JOB_EVAL_CV_PDF_OUTPUT}" || echo skipped)"
             echo "- Unsuitable row policy: ${JOB_EVAL_UNSUITABLE_ROW_POLICY}"
             echo "- Started at: $(date +'%Y-%m-%dT%H:%M:%S%z')"
             echo "- GitHub run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
@@ -510,6 +636,14 @@ jobs:
             reports/*.md
           if-no-files-found: ignore
 
+      - name: Upload Excel output
+        if: always() && env.JOBFINDER_SCRAPER_OUTPUT_MODE == 'excel'
+        uses: actions/upload-artifact@v7
+        with:
+          name: jobfinder-excel-output
+          path: jobs.xlsx
+          if-no-files-found: ignore
+
       - name: Remove private runtime files
         if: always()
         shell: bash
@@ -521,5 +655,6 @@ jobs:
             cv/photo.jpg \
             google_token.json \
             google_spreadsheet_id.txt \
+            jobs.xlsx \
             pipeline.log
           rm -rf reports

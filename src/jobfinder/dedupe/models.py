@@ -142,3 +142,4 @@ class DedupeResult:
     decisions: list[MatchDecision] = field(default_factory=list)
     input_count: int = 0
     output_count: int = 0
+    clusters: list[tuple[NormalizedJob, ...]] = field(default_factory=list)
