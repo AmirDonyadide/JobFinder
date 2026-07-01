@@ -7,18 +7,24 @@ from urllib.parse import urlencode
 
 from jobfinder.scraper.settings import ScraperSettings
 
+LINKEDIN_MIN_COUNT = 10
+
 
 def build_search_url(settings: ScraperSettings, keyword: str) -> str:
     """Build a LinkedIn job-search URL for one keyword."""
     params = {
         "keywords": keyword,
-        "location": settings.location,
-        "geoId": settings.geo_id,
-        "f_E": ",".join(settings.experience_levels),
-        "f_JT": ",".join(settings.contract_types),
         "position": "1",
         "pageNum": "0",
     }
+    if settings.location:
+        params["location"] = settings.location
+    if settings.geo_id:
+        params["geoId"] = settings.geo_id
+    if settings.experience_levels:
+        params["f_E"] = ",".join(settings.experience_levels)
+    if settings.contract_types:
+        params["f_JT"] = ",".join(settings.contract_types)
     posted_window = getattr(settings, "provider_posted_window", settings.published_at)
     if posted_window:
         params["f_TPR"] = posted_window
@@ -30,9 +36,8 @@ def build_actor_input(settings: ScraperSettings, search_url: str) -> dict[str, A
     """Build the Apify actor payload for LinkedIn searches."""
     payload = {
         "urls": [search_url],
-        "count": settings.max_results_per_search,
+        "count": max(LINKEDIN_MIN_COUNT, settings.max_results_per_search),
         "scrapeCompany": settings.scrape_company_details,
-        "useIncognitoMode": settings.use_incognito_mode,
         "splitByLocation": settings.split_by_location,
     }
     if settings.split_by_location:
@@ -46,7 +51,10 @@ def build_batch_actor_input(
     """Build a LinkedIn actor payload containing multiple search URLs."""
     payload = build_actor_input(settings, search_urls[0])
     payload["urls"] = search_urls
-    payload["count"] = settings.max_results_per_search * len(search_urls)
+    payload["count"] = max(
+        LINKEDIN_MIN_COUNT,
+        settings.max_results_per_search * len(search_urls),
+    )
     return payload
 
 

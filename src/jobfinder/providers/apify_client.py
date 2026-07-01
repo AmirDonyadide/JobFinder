@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 import time
 from collections.abc import MutableMapping
 from typing import Any
@@ -41,6 +43,42 @@ APIFY_CREDIT_ERROR_TERMS = (
 )
 
 LOGGER = logging.getLogger("jobfinder.scraper")
+SENSITIVE_LOG_KEY_RE = re.compile(
+    r"token|authorization|cookie|password|secret|api[_-]?key",
+    re.IGNORECASE,
+)
+SENSITIVE_QUERY_RE = re.compile(
+    r"(?i)(token|api[_-]?key|authorization)=([^&\s\"']+)",
+)
+
+
+def redact_for_log(value: Any, *, key: str = "") -> Any:
+    """Return a recursively redacted value suitable for diagnostic logging."""
+    if key and SENSITIVE_LOG_KEY_RE.search(key):
+        return "<redacted>"
+    if isinstance(value, dict):
+        return {
+            str(child_key): redact_for_log(child_value, key=str(child_key))
+            for child_key, child_value in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_for_log(item) for item in value]
+    if isinstance(value, tuple):
+        return [redact_for_log(item) for item in value]
+    if isinstance(value, str):
+        return SENSITIVE_QUERY_RE.sub(r"\1=<redacted>", value)
+    return value
+
+
+def json_for_log(value: Any, *, max_chars: int = 4_000) -> str:
+    """Serialize diagnostic data without exposing secrets or huge descriptions."""
+    try:
+        text = json.dumps(redact_for_log(value), ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        text = repr(redact_for_log(value))
+    if len(text) > max_chars:
+        return f"{text[:max_chars]}... <truncated {len(text) - max_chars} chars>"
+    return text
 
 
 class ApifyConfigurationError(RuntimeError):
@@ -222,12 +260,20 @@ def start_actor_run(
     token: ApifyTokenSelection | None = None,
 ) -> dict[str, Any]:
     """Start a configured Apify actor and return its run metadata."""
-    url = f"https://api.apify.com/v2/acts/{actor_id}/runs"
+    url = f"https://api.apify.com/v2/actors/{actor_id}/runs"
     params = {
         "timeout": settings.apify_run_timeout_seconds,
-        "memory": settings.apify_run_memory_mb,
         "maxItems": max_items,
     }
+    if settings.apify_run_memory_mb:
+        params["memory"] = settings.apify_run_memory_mb
+
+    LOGGER.info(
+        "Starting Apify actor %s with run options %s and input %s.",
+        actor_id,
+        json_for_log(params),
+        json_for_log(payload),
+    )
 
     response = requests.post(
         url,
@@ -241,6 +287,13 @@ def start_actor_run(
     data = apify_response_data(response)
     if not isinstance(data, dict) or not data.get("id"):
         raise ApifyRunError(f"Apify did not return a run id for actor {actor_id}.")
+    LOGGER.info(
+        "Apify actor %s accepted run %s (initial status=%s, dataset=%s).",
+        actor_id,
+        data.get("id"),
+        data.get("status") or "unknown",
+        data.get("defaultDatasetId") or "pending",
+    )
     return data
 
 
@@ -278,11 +331,28 @@ def wait_for_actor_run(
         + APIFY_POLL_INTERVAL_SECONDS
     )
 
+    previous_status = ""
     while True:
         run = get_actor_run(settings, actor_id, run_id, token)
         status = str(run.get("status") or "").upper()
+        if status != previous_status:
+            LOGGER.debug(
+                "Apify run %s for %s changed status to %s: %s",
+                run_id,
+                actor_id,
+                status or "unknown",
+                apify_run_message(run) or "no status message",
+            )
+            previous_status = status
         if status in APIFY_TERMINAL_STATUSES:
             if status == "SUCCEEDED":
+                LOGGER.info(
+                    "Apify run %s for %s finished with status SUCCEEDED "
+                    "(dataset=%s).",
+                    run_id,
+                    actor_id,
+                    run.get("defaultDatasetId") or "unknown",
+                )
                 return run
             if status == "TIMED-OUT":
                 raise ApifyRunTimeoutError(
@@ -340,11 +410,31 @@ def fetch_dataset_items(
             f"{response.text.strip()[:500] or response.reason}"
         ) from exc
     if isinstance(data, list):
-        return data
+        items = data
     if isinstance(data, dict) and "items" in data:
         items = data["items"]
-        return items if isinstance(items, list) else []
-    return []
+        items = items if isinstance(items, list) else []
+    elif not isinstance(data, list):
+        items = []
+
+    object_items = [item for item in items if isinstance(item, dict)]
+    skipped = len(items) - len(object_items)
+    LOGGER.info(
+        "Fetched %s dataset item(s) from %s for actor %s%s.",
+        len(object_items),
+        dataset_id,
+        actor_id,
+        f"; skipped {skipped} non-object item(s)" if skipped else "",
+    )
+    for index, item in enumerate(object_items[:3]):
+        LOGGER.debug(
+            "Raw Apify item %s/%s from %s: %s",
+            index + 1,
+            len(object_items),
+            actor_id,
+            json_for_log(item),
+        )
+    return object_items
 
 
 def run_actor(
@@ -364,13 +454,24 @@ def run_actor(
                 raise ApifyRunError(
                     f"Apify run {run_id} did not include a default dataset id."
                 )
-            return fetch_dataset_items(
+            items = fetch_dataset_items(
                 settings,
                 actor_id,
                 str(dataset_id),
                 max_items,
                 token,
             )
+            if not items:
+                LOGGER.warning(
+                    "Apify actor %s run %s succeeded but dataset %s returned zero "
+                    "items. Input was %s. Check actor logs, search breadth, date "
+                    "filters, and input-schema compatibility.",
+                    actor_id,
+                    run_id,
+                    dataset_id,
+                    json_for_log(payload),
+                )
+            return items
         except ApifyAccountUnavailableError as exc:
             next_token = retire_apify_token(settings, token)
             if next_token is None:

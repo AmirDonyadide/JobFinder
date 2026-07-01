@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -32,24 +33,17 @@ class XingActorInput:
 
     keyword: str
     location: str
-    discipline: str
-    remote: str
+    date_posted: str
     start_url: str
     results_wanted: int
     max_pages: int
-    use_apify_proxy: bool
-    proxy_groups: tuple[str, ...]
 
     def as_payload(self) -> dict[str, Any]:
         """Return the JSON payload accepted by the Apify actor."""
         payload: dict[str, Any] = {
             "results_wanted": self.results_wanted,
             "max_pages": self.max_pages,
-            "proxyConfiguration": {"useApifyProxy": self.use_apify_proxy},
         }
-
-        if self.proxy_groups:
-            payload["proxyConfiguration"]["apifyProxyGroups"] = list(self.proxy_groups)
 
         if self.start_url:
             payload["startUrl"] = self.start_url
@@ -59,10 +53,8 @@ class XingActorInput:
             payload["keyword"] = self.keyword
         if self.location:
             payload["location"] = self.location
-        if self.discipline:
-            payload["discipline"] = self.discipline
-        if self.remote:
-            payload["remote"] = self.remote
+        if self.date_posted:
+            payload["date_posted"] = self.date_posted
         return payload
 
 
@@ -133,15 +125,37 @@ def build_actor_input(settings: ScraperSettings, keyword: str) -> dict[str, Any]
     actor_input = XingActorInput(
         keyword=keyword,
         location=settings.xing_location,
-        discipline=settings.xing_discipline,
-        remote=settings.xing_remote,
+        date_posted=date_posted_filter(settings),
         start_url=settings.xing_start_url,
         results_wanted=settings.xing_max_results_per_search,
         max_pages=settings.xing_max_pages,
-        use_apify_proxy=settings.xing_use_apify_proxy,
-        proxy_groups=tuple(settings.xing_proxy_groups),
     )
     return actor_input.as_payload()
+
+
+def date_posted_filter(settings: ScraperSettings) -> str:
+    """Map the pipeline window to Xing's three supported live date filters."""
+    explicit = str(getattr(settings, "xing_date_posted", "") or "").strip().upper()
+    if explicit:
+        return explicit
+
+    posted_window = getattr(
+        settings,
+        "provider_posted_window",
+        getattr(settings, "published_at", ""),
+    )
+    seconds = provider_normalization.seconds_from_published_at(posted_window)
+    if seconds is None:
+        return ""
+
+    days = max(1, math.ceil(seconds / 86_400))
+    if days <= 1:
+        return "LAST_24_HOURS"
+    if days <= 7:
+        return "LAST_WEEK"
+    if days <= 30:
+        return "LAST_MONTH"
+    return ""
 
 
 def build_direct_actor_input(settings: ScraperSettings) -> dict[str, Any]:
@@ -164,7 +178,11 @@ def run_actor_search(
 
 def normalize_actor_output(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Normalize all actor items into the scraper's stable raw-job contract."""
-    return [normalize_actor_item(item) for item in items if isinstance(item, dict)]
+    return provider_normalization.normalize_actor_items(
+        items,
+        normalize_actor_item,
+        provider="Xing",
+    )
 
 
 def normalize_actor_item(item: dict[str, Any]) -> dict[str, Any]:

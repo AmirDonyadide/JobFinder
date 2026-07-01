@@ -211,10 +211,10 @@ Common settings:
 | `JOBFINDER_SCRAPER_APIFY_MEMORY_LIMIT_MB` | `0` | Optional total Apify memory cap used to reduce search concurrency; `0` disables the cap. |
 | `JOBFINDER_SCRAPER_APIFY_BATCH_SIZE` | `1` | Optional LinkedIn search batch size. Keep `1` unless actor results expose source search URLs for attribution. |
 | `JOBFINDER_SCRAPER_MAX_RESULTS_PER_SEARCH` | `500` | Maximum LinkedIn results per keyword. |
-| `JOBFINDER_SCRAPER_POSTED_TIME_WINDOW` | `since_previous_run` | Use `since_previous_run`, `last_24h`, `last_7d`, or `backfill` to control provider posted-time filters. LinkedIn uses second-based windows; Indeed and Stepstone use the closest supported actor day bucket when possible. Xing is filtered after scraping when posted dates are present. |
+| `JOBFINDER_SCRAPER_POSTED_TIME_WINDOW` | `since_previous_run` | Use `since_previous_run`, `last_24h`, `last_7d`, or `backfill` to control provider posted-time filters. LinkedIn uses second-based windows; Indeed, Stepstone, and Xing map to their supported actor buckets when possible. |
 | `JOBFINDER_SCRAPER_SEARCH_WINDOW_BUFFER_SECONDS` | `3600` | Extra search-window padding before exact posted-time filtering, to avoid missing jobs while the run is starting. |
 | `JOBFINDER_SCRAPER_MAX_APPLICANTS` | `100` | Maximum applicants per job after scraping. Use `0` for no limit. |
-| `APIFY_RUN_MEMORY_MB` | `512` | Memory assigned to each Apify actor run. |
+| `APIFY_RUN_MEMORY_MB` | `0` | Optional global memory override. `0` uses each actor's own default and avoids forcing one size across incompatible actors. |
 | `APIFY_RUN_TIMEOUT_SECONDS` | `3600` | Maximum Apify actor runtime per keyword search. |
 | `APIFY_CLIENT_TIMEOUT_SECONDS` | `120` | HTTP timeout for individual Apify API calls while starting, polling, and reading results. |
 | `APIFY_TRANSIENT_ERROR_RETRIES` | `5` | Number of retry attempts for temporary Apify API/run errors before failing the run. |
@@ -233,8 +233,7 @@ Common settings:
 | `STEPSTONE_MAX_CONCURRENCY` | `10` | Maximum pages the Stepstone actor processes concurrently inside a run. |
 | `STEPSTONE_MAX_REQUEST_RETRIES` | `3` | Stepstone actor page retry count. |
 | `XING_LOCATION` | `Germany` | Xing country, city, or region filter for keyword searches. |
-| `XING_DISCIPLINE` | blank | Optional Xing discipline filter. Blank means keyword-only role filtering. |
-| `XING_REMOTE` | blank | Optional Xing remote filter passed through to the actor when set. |
+| `XING_DATE_POSTED` | derived | Optional `LAST_24_HOURS`, `LAST_WEEK`, or `LAST_MONTH` override. |
 | `XING_START_URL` | blank | Optional direct Xing search URL. When set, Xing runs one direct-URL actor search instead of one run per keyword. |
 | `XING_MAX_RESULTS_PER_SEARCH` | `500` | Maximum Xing results per keyword or direct URL run. |
 | `XING_MAX_PAGES` | `20` | Maximum Xing result pages for the actor to process. |

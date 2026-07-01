@@ -26,6 +26,7 @@ For a project overview, go back to the [main README](../README.md).
 |---|---|
 | [How it works](how-it-works.md) | The scraping, dedupe, history, and evaluation flow. |
 | [Architecture](architecture.md) | Module ownership, boundaries, and design direction. |
+| [Apify scraper audit](apify-scraper-audit.md) | Current actor schemas, parser compatibility, and live smoke-test commands. |
 | [Developer guide](developer-guide.md) | Local setup, CI checks, testing, and extension points. |
 
 The deepest reference lives next to the code: each module under

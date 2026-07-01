@@ -16,6 +16,7 @@ from jobfinder.providers.normalization import (
     first_text,
     format_money,
     nested_text,
+    normalize_actor_items,
     parse_salary_number,
     populated_metadata_dict,
     seconds_from_published_at,
@@ -244,7 +245,7 @@ def run_actor_search(
 
 def normalize_actor_output(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Normalize all actor items into the scraper's stable raw-job contract."""
-    return [normalize_actor_item(item) for item in items if isinstance(item, dict)]
+    return normalize_actor_items(items, normalize_actor_item, provider="Indeed")
 
 
 def normalize_actor_item(item: dict[str, Any]) -> dict[str, Any]:
@@ -320,6 +321,9 @@ def company_details(employer: dict[str, Any]) -> dict[str, Any]:
         ("employeesCount", "employeesCount"),
         ("ratingsValue", "ratingsValue"),
         ("ratingsCount", "ratingsCount"),
+        ("companyPageUrl", "url"),
+        ("corporateWebsite", "website"),
+        ("logoUrl", "logoUrl"),
         ("relativeCompanyPageUrl", "relativeCompanyPageUrl"),
     ):
         value = employer.get(source_key)
@@ -360,8 +364,8 @@ def format_job_types(item: dict[str, Any]) -> str:
 def format_salary(value: Any) -> str:
     """Normalize structured or text salary data into compact display text."""
     if isinstance(value, dict):
-        min_value = parse_salary_number(value.get("minValue"))
-        max_value = parse_salary_number(value.get("maxValue"))
+        min_value = parse_salary_number(value.get("minValue", value.get("min")))
+        max_value = parse_salary_number(value.get("maxValue", value.get("max")))
         currency = first_text(value, "currencyCode")
         unit = salary_unit_label(first_text(value, "unitOfWork"))
 

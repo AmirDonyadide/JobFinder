@@ -79,9 +79,10 @@ def test_build_actor_input_uses_keyword_location_and_date_bucket():
     )
 
     assert payload == {
-        "keyword": "data-analyst",
-        "location": "germany",
+        "keyword": "Data Analyst",
+        "location": "deutschland",
         "postedWithin": "3",
+        "includeRelatedJobs": False,
         "maxItems": 250,
         "maxConcurrency": 10,
         "minConcurrency": 1,
@@ -106,6 +107,7 @@ def test_build_actor_input_uses_direct_urls_without_keyword_filters():
     assert "keyword" not in payload
     assert "location" not in payload
     assert "postedWithin" not in payload
+    assert payload["includeRelatedJobs"] is False
 
 
 def test_normalize_actor_item_preserves_contract_and_internal_metadata():
