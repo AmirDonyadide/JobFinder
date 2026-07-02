@@ -231,7 +231,8 @@ jobs:
       JOB_EVAL_OPENAI_MODEL: "gpt-5-mini"
       JOB_EVAL_CONCURRENCY: "8"
       JOB_EVAL_BATCH_SIZE: "40"
-      JOB_EVAL_CV_PHOTO_FILE: cv/photo.jpg
+      JOB_EVAL_CV_PHOTO_FILE: cv/photo.png
+      JOB_EVAL_CV_MAX_PAGES: "2"
       JOB_EVAL_CV_PDF_OUTPUT: ${{ github.event.inputs.cv_pdf_output || 'true' }}
       JOB_EVAL_CV_PDF_APPLICANT_NAME: "Amir Donyadide"
       JOB_EVAL_CV_PDF_TIMEOUT: "120"
@@ -468,7 +469,7 @@ jobs:
                   photo_bytes = base64.b64decode(photo_base64, validate=True)
               except binascii.Error as exc:
                   raise SystemExit(f"CV_PHOTO_BASE64 is not valid base64: {exc}") from exc
-              photo_path = Path(os.environ.get("JOB_EVAL_CV_PHOTO_FILE", "cv/photo.jpg"))
+              photo_path = Path(os.environ.get("JOB_EVAL_CV_PHOTO_FILE", "cv/photo.png"))
               photo_path.parent.mkdir(parents=True, exist_ok=True)
               photo_path.write_bytes(photo_bytes)
           PY
@@ -652,7 +653,7 @@ jobs:
             configs/keywords.txt \
             prompts/master_prompt.txt \
             cv/master_cv.tex \
-            cv/photo.jpg \
+            cv/photo.png \
             google_token.json \
             google_spreadsheet_id.txt \
             jobs.xlsx \

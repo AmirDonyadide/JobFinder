@@ -60,7 +60,7 @@ def test_parse_unsuitable_row_policy_rejects_unknown_values():
 
 
 def test_resolve_cv_photo_file_accepts_png_fallback(tmp_path):
-    """The evaluator should find a committed photo.png when photo.jpg is absent."""
+    """The evaluator should find photo.png when a legacy JPG path is configured."""
     photo = tmp_path / "photo.png"
     photo.write_bytes(b"png")
 

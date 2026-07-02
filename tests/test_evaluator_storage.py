@@ -332,7 +332,7 @@ def test_final_google_cleanup_removes_multi_label_not_suitable_rows():
                 "Language proficiency mismatch; Degree mismatch",
                 "",
             ],
-            ["Keep suitable", "Description", "Suitable", 90, "", "CV"],
+            ["Keep suitable", "Description", "Suitable", 18, "", "CV"],
         ]
     )
 

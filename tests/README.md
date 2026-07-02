@@ -51,6 +51,7 @@ python -m pytest
 | `test_dedupe_matching.py` | Cross-provider matching, blockers, provenance, and historical dedupe identity. |
 | `test_google_sheets.py` | Shared Google OAuth token auth, refresh, API service construction, scopes, and missing credential messages. |
 | `test_cv_pdf_output.py` | PDF filename sanitization, CV ID assignment, LaTeX compile failures, Drive folder ID handling, and mocked Drive uploads. |
+| `test_cv_contract.py` | Locked Master-CV content, course pools, exact projects, experience identity, and overflow block removals. |
 | `test_indeed_provider.py` | Indeed actor payloads and normalization. |
 | `test_linkedin_provider.py` | LinkedIn public-search URL and live actor input schema. |
 | `test_stepstone_provider.py` | Stepstone actor payloads and normalization. |

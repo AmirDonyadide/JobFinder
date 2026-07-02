@@ -215,7 +215,7 @@ cp cv/master_cv.example.tex cv/master_cv.tex
 | `configs/keywords.txt` | `JOB_KEYWORDS_TEXT` |
 | `prompts/master_prompt.txt` | `MASTER_PROMPT_TEXT` |
 | `cv/master_cv.tex` | `MASTER_CV_TEX` |
-| `cv/photo.jpg` | `CV_PHOTO_BASE64` (optional, base64 encoded) |
+| `cv/photo.png` | `CV_PHOTO_BASE64` (optional, base64 encoded) |
 | `google_token.json` | `GOOGLE_TOKEN_JSON` |
 
 On macOS, copy each value like this:
@@ -240,10 +240,10 @@ scopes, writes it to `google_token.json` on the runner, and preflight-checks the
 configured Google Sheet and Drive folder before the pipeline work starts.
 
 If your LaTeX CV references a private photo and you do not commit a public
-`cv/photo.jpg`, encode it for the optional `CV_PHOTO_BASE64` secret:
+`cv/photo.png`, encode it for the optional `CV_PHOTO_BASE64` secret:
 
 ```bash
-base64 -i cv/photo.jpg | pbcopy
+base64 -i cv/photo.png | pbcopy
 ```
 
 ## 6. Add GitHub Repository Secrets
@@ -266,7 +266,7 @@ Add these secrets exactly:
 | `JOB_KEYWORDS_TEXT` | All runs | The full contents of `configs/keywords.txt`. |
 | `MASTER_PROMPT_TEXT` | `scrape_and_evaluate` | The full contents of `prompts/master_prompt.txt`. |
 | `MASTER_CV_TEX` | `scrape_and_evaluate` | The full contents of `cv/master_cv.tex`. |
-| `CV_PHOTO_BASE64` | Optional when CV PDF output is enabled | Base64-encoded `cv/photo.jpg` for LaTeX PDF generation when the photo is private. |
+| `CV_PHOTO_BASE64` | Optional when CV PDF output is enabled | Base64-encoded `cv/photo.png` for LaTeX PDF generation when the photo is private. |
 
 ## 7. Run The Workflow Manually
 
@@ -317,6 +317,11 @@ Choose CV PDF output:
 
 - `true`: install LaTeX during evaluating runs and upload tailored CV PDFs to Drive.
 - `false`: skip LaTeX and Drive PDF upload while still running the evaluator.
+
+PDF-enabled evaluation always uses the Master-CV two-page policy. An overlong
+CV loses one relevance-ranked project and is recompiled; if still long, it loses
+one relevance-ranked experience and is recompiled. No generic AI shortening pass
+is used, and a still-long result is retained after those two exact removals.
 
 Choose the unsuitable-row policy:
 
@@ -396,7 +401,7 @@ JOB_EVAL_OPENAI_MODEL: "gpt-5-mini"
 JOB_EVAL_CONCURRENCY: "8"
 JOB_EVAL_BATCH_SIZE: "40"
 JOB_EVAL_CV_PDF_OUTPUT: ${{ github.event.inputs.cv_pdf_output || 'true' }}
-JOB_EVAL_CV_PHOTO_FILE: cv/photo.jpg
+JOB_EVAL_CV_PHOTO_FILE: cv/photo.png
 JOB_EVAL_CV_PDF_APPLICANT_NAME: "Amir Donyadide"
 JOB_EVAL_CV_PDF_TIMEOUT: "120"
 JOB_EVAL_LARGE_QUEUE_THRESHOLD: "200"
@@ -474,7 +479,7 @@ Use GitHub secrets for private values:
 | `GOOGLE_TOKEN_JSON` error | Copy the full authorized-user token JSON from `google_token.json`. |
 | Google Sheets authentication fails | Enable Sheets and Drive APIs, confirm the token account can access the spreadsheet, and recreate `google_token.json` if scopes changed. |
 | Drive PDF links fail | Set `JOB_EVAL_CV_DRIVE_FOLDER_ID`, confirm the folder is accessible to the token account, enable Drive API, and recreate `google_token.json` if scopes changed. |
-| `LaTeX compilation failed` in `AI CV PDF` | Check that `latexmk`/`xelatex` installed, the generated LaTeX is valid, and any referenced photo is available through committed `cv/photo.jpg` or `CV_PHOTO_BASE64`. |
+| `LaTeX compilation failed` in `AI CV PDF` | Check that `latexmk`/`xelatex` installed, the generated LaTeX is valid, and any referenced photo is available through committed `cv/photo.png` or `CV_PHOTO_BASE64`. |
 | Spreadsheet not found | Check that `GOOGLE_SPREADSHEET_ID` is only the ID, not the full URL. |
 | Workflow cannot push or fetch repo | Check GitHub authentication and repository permissions. |
 | OpenAI rate-limit retries | Lower `JOB_EVAL_CONCURRENCY` and `JOB_EVAL_BATCH_SIZE`. |

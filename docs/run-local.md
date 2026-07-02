@@ -101,7 +101,7 @@ For a local fork, the important customization points are:
 | Local secrets and runtime tuning | `.env` |
 | Evaluator instructions | `prompts/master_prompt.txt` |
 | Private LaTeX CV | `cv/master_cv.tex` |
-| Optional photo path | `JOB_EVAL_CV_PHOTO_FILE` in `.env`; defaults to `cv/photo.jpg` |
+| Optional photo path | `JOB_EVAL_CV_PHOTO_FILE` in `.env`; defaults to `cv/photo.png` |
 | Applicant name in generated PDF filenames | `JOB_EVAL_CV_PDF_APPLICANT_NAME` |
 | Target Google Sheet | `GOOGLE_SPREADSHEET_ID` or `google_spreadsheet_id.txt` |
 | Target Drive folder for generated CV PDFs | `JOB_EVAL_CV_DRIVE_FOLDER_ID` |
@@ -173,7 +173,7 @@ Then edit:
 | `configs/filters.json` | Search settings, title exclusions, company exclusions, status dropdown values, and applicant cap. |
 | `prompts/master_prompt.txt` | Your evaluator instructions. |
 | `cv/master_cv.tex` | Your private LaTeX CV. |
-| `cv/photo.jpg` | Optional CV photo referenced by LaTeX. Commit it only if it is public. |
+| `cv/photo.png` | Optional CV photo referenced by LaTeX. Commit it only if it is public. |
 
 Do not commit these private files.
 
@@ -247,7 +247,8 @@ Common settings:
 | `JOB_EVAL_OPENAI_TIMEOUT` | `120` | OpenAI request timeout in seconds. |
 | `JOB_EVAL_MAX_OUTPUT_TOKENS` | `9000` | Maximum tokens allowed in each evaluation response. |
 | `JOB_EVAL_CV_PDF_OUTPUT` | `true` | Compile generated LaTeX CVs to PDFs and save them to Google Drive. |
-| `JOB_EVAL_CV_PHOTO_FILE` | `cv/photo.jpg` | Optional photo copied into each temporary LaTeX build directory. |
+| `JOB_EVAL_CV_PHOTO_FILE` | `cv/photo.png` | Optional photo copied into each temporary LaTeX build directory. |
+| `JOB_EVAL_CV_MAX_PAGES` | `2` | Fixed Master-CV target; other values are rejected. |
 | `JOB_EVAL_CV_PDF_TIMEOUT` | `120` | Max seconds per LaTeX compilation. |
 | `JOB_EVAL_CV_DRIVE_FOLDER_ID` | blank | Google Drive folder ID for timestamped PDF run folders. Required when PDF output is enabled. |
 | `JOB_EVAL_CV_PDF_APPLICANT_NAME` | `Applicant` | Applicant name used in upload-safe PDF filenames like `12_CV_Applicant_GIS_Analyst_Acme.pdf`. |
@@ -394,7 +395,7 @@ python job_fit_evaluator.py --source excel --sheet latest
   that tab instead of scraping again.
 - Completed evaluations are saved as rows finish, so a later failure keeps already completed rows.
 - By default, final cleanup keeps only one-label `Not Suitable` rows. Set `JOB_EVAL_UNSUITABLE_ROW_POLICY=keep_all` to preserve all evaluated rows.
-- After evaluation with PDF output enabled, the final AI columns are `AI Verdict`, `AI Fit Score` (0-26), `AI Unsuitable Reasons`, and `AI CV PDF`; the temporary `AI Tailored CV` column is removed during final cleanup.
+- After evaluation with PDF output enabled, the final AI columns are `AI Verdict`, `AI Fit Score` (0-20), `AI Unsuitable Reasons`, and `AI CV PDF`; the temporary `AI Tailored CV` column is removed during final cleanup.
 - `AI CV PDF` contains a Google Drive PDF link on success, or a LaTeX/Drive error for that row.
 
 ## 8. Troubleshooting Local Runs
@@ -436,7 +437,7 @@ google_spreadsheet_id.txt
 configs/keywords.txt
 prompts/master_prompt.txt
 cv/master_cv.tex
-cv/photo.jpg  # unless intentionally public
+cv/photo.png  # unless intentionally public
 ```
 
 If you expose `google_token.json`, revoke the OAuth grant in your Google

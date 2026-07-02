@@ -21,7 +21,6 @@ from jobfinder.evaluator.parsing import (
 )
 from jobfinder.evaluator.pdf_output import (
     DEFAULT_CV_MAX_PAGES,
-    DEFAULT_CV_MAX_SHORTEN_ATTEMPTS,
     DEFAULT_CV_PDF_APPLICANT_NAME,
     DEFAULT_DRIVE_PARENT_FOLDER_ID,
     generate_cv_pdf_outputs,
@@ -102,7 +101,6 @@ class EvaluationOptions:
     save_batch_size: int
     unsuitable_row_policy: str
     cv_max_pages: int
-    cv_max_shorten_attempts: int
 
 
 @dataclass(frozen=True)
@@ -177,12 +175,6 @@ def options_from_env(
             env.get("JOB_EVAL_UNSUITABLE_ROW_POLICY")
         ),
         cv_max_pages=max(1, env.get_int("JOB_EVAL_CV_MAX_PAGES", DEFAULT_CV_MAX_PAGES)),
-        cv_max_shorten_attempts=max(
-            0,
-            env.get_int(
-                "JOB_EVAL_CV_MAX_SHORTEN_ATTEMPTS", DEFAULT_CV_MAX_SHORTEN_ATTEMPTS
-            ),
-        ),
     )
 
 
@@ -243,10 +235,10 @@ def validate_runtime_settings(options: EvaluationOptions) -> None:
         )
     if options.cv_pdf_compile_timeout < 1:
         raise EvaluationError("JOB_EVAL_CV_PDF_TIMEOUT must be 1 or greater.")
-    if options.cv_max_pages < 1:
-        raise EvaluationError("JOB_EVAL_CV_MAX_PAGES must be 1 or greater.")
-    if options.cv_max_shorten_attempts < 0:
-        raise EvaluationError("JOB_EVAL_CV_MAX_SHORTEN_ATTEMPTS must be 0 or greater.")
+    if options.cv_max_pages != DEFAULT_CV_MAX_PAGES:
+        raise EvaluationError(
+            "JOB_EVAL_CV_MAX_PAGES must be 2 to match the Master CV contract."
+        )
     if options.large_queue_threshold < 0:
         raise EvaluationError("JOB_EVAL_LARGE_QUEUE_THRESHOLD must be 0 or greater.")
     if options.large_queue_sleep_ms < 0:
@@ -468,14 +460,11 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
         LOGGER.info("Compiling generated CVs to PDF and uploading to Google Drive ...")
         if options.cv_max_pages > 0:
             LOGGER.info(
-                "CV page limit: %s page(s) max (up to %s AI shortening attempt(s)).",
+                "CV page policy: target %s pages; if exceeded, remove one project, "
+                "then one experience, recompiling after each removal.",
                 options.cv_max_pages,
-                options.cv_max_shorten_attempts,
             )
         photo_path = resolve_cv_photo_file(options.cv_photo_file)
-
-        def _shorten_cv(latex_code: str, page_count: int) -> str:
-            return evaluator.shorten_latex(latex_code, page_count, options.cv_max_pages)
 
         pdf_result = generate_cv_pdf_outputs(
             records,
@@ -485,8 +474,6 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
             applicant_name=options.cv_pdf_applicant_name,
             timeout_seconds=options.cv_pdf_compile_timeout,
             max_page_limit=options.cv_max_pages,
-            shorten_latex=_shorten_cv if options.cv_max_shorten_attempts > 0 else None,
-            max_shorten_attempts=options.cv_max_shorten_attempts,
         )
         cv_pdf_count = pdf_result.success_count
         cv_pdf_error_count = pdf_result.error_count

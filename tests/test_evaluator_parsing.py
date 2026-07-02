@@ -108,7 +108,7 @@ def test_extract_job_records_skips_suitable_rows_with_pdf_link_without_cv():
 def test_parse_model_response_extracts_verdict_score_reason_and_cv():
     """Machine-readable model responses should parse into evaluator fields."""
     response = """Verdict: Suitable
-Fit Score: 22
+    Fit Score: 18
 
 Strong GIS/Python match.
 
@@ -121,7 +121,7 @@ Customized CV (LaTeX):
     result = parse_model_response(response, row_number=7, model="test-model")
 
     assert result.verdict == "Suitable"
-    assert result.fit_score == 22
+    assert result.fit_score == 18
     assert result.reason == "Strong GIS/Python match."
     assert result.tailored_cv == r"\section{Experience}"
     assert result.value_for_column("AI Unsuitable Reasons") == ""
@@ -147,6 +147,34 @@ Unsuitable Reasons: Requires fluent German and senior cloud architecture experie
     assert result.value_for_column("AI Unsuitable Reasons") == (
         "Requires fluent German and senior cloud architecture experience."
     )
+
+
+def test_parse_model_response_enforces_20_point_verdict_boundaries():
+    suitable = parse_model_response(
+        "Verdict: Suitable\nFit Score: 11\nUnsuitable Reasons:",
+        row_number=2,
+        model="test-model",
+    )
+    rejected = parse_model_response(
+        "Verdict: Not Suitable\nFit Score: 10\nUnsuitable Reasons: Role type mismatch",
+        row_number=3,
+        model="test-model",
+    )
+    contradictory = parse_model_response(
+        "Verdict: Suitable\nFit Score: 10\nUnsuitable Reasons:",
+        row_number=4,
+        model="test-model",
+    )
+    out_of_range = parse_model_response(
+        "Verdict: Suitable\nFit Score: 21\nUnsuitable Reasons:",
+        row_number=5,
+        model="test-model",
+    )
+
+    assert suitable.verdict == "Suitable"
+    assert rejected.verdict == "Not Suitable"
+    assert contradictory.verdict == "Error"
+    assert out_of_range.verdict == "Error"
 
 
 def test_enforce_protected_cv_sections_restores_master_education():
