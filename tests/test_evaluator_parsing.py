@@ -160,6 +160,11 @@ def test_parse_model_response_enforces_20_point_verdict_boundaries():
         row_number=3,
         model="test-model",
     )
+    hard_rejected = parse_model_response(
+        "Verdict: Not Suitable\nFit Score: 15\nUnsuitable Reasons: Seniority mismatch",
+        row_number=6,
+        model="test-model",
+    )
     contradictory = parse_model_response(
         "Verdict: Suitable\nFit Score: 10\nUnsuitable Reasons:",
         row_number=4,
@@ -173,6 +178,7 @@ def test_parse_model_response_enforces_20_point_verdict_boundaries():
 
     assert suitable.verdict == "Suitable"
     assert rejected.verdict == "Not Suitable"
+    assert hard_rejected.verdict == "Not Suitable"
     assert contradictory.verdict == "Error"
     assert out_of_range.verdict == "Error"
 

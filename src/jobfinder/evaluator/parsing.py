@@ -481,7 +481,9 @@ def parse_model_response(
 
     score_is_valid = 0 <= score <= 20
     verdict_matches_score = (verdict == "Suitable" and 11 <= score <= 20) or (
-        verdict == "Not Suitable" and 0 <= score <= 10
+        # Hard rejections can make a role Not Suitable even when its raw
+        # component score is above 10.
+        verdict == "Not Suitable" and score_is_valid
     )
     if verdict is None or not score_is_valid or not verdict_matches_score:
         return JobEvaluation(

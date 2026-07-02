@@ -396,5 +396,11 @@ def evaluate_records(
                     evaluation.verdict,
                     score,
                 )
+                if evaluation.error:
+                    LOGGER.warning(
+                        "Row %s evaluator error: %s",
+                        record.row_number,
+                        evaluation.error,
+                    )
 
     return results
