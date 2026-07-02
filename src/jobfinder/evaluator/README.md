@@ -84,6 +84,7 @@ Do not commit real prompts, CVs, or Google token files.
 | Module | Responsibility |
 |---|---|
 | `models.py` | Evaluation dataclasses, final AI output columns, and spreadsheet-safe value handling. |
+| `cv_contract.py` | Master-CV structure validation, locked-content enforcement, exact project selection, and safe overflow removals. |
 | `parsing.py` | Header normalization, job-record extraction, prompt construction, and model-response parsing. |
 | `openai_client.py` | OpenAI Responses API integration, retry classification, concurrency, batching, and pacing. |
 | `latex.py` | Isolated LaTeX compilation with captured compiler errors. |
@@ -149,7 +150,7 @@ the first lines:
 
 ```text
 Verdict: <Suitable | Not Suitable>
-Fit Score: <integer from 0 to 26>
+Fit Score: <integer from 0 to 20>
 Unsuitable Reasons: <category labels only when Not Suitable, otherwise blank>
 ```
 
@@ -159,7 +160,7 @@ The final evaluator columns are defined in `spreadsheet/schema.py` and imported
 through `models.py`:
 
 - `AI Verdict`
-- `AI Fit Score` (0-26)
+- `AI Fit Score` (0-20; Suitable starts at 11 unless a hard rejection applies)
 - `AI Unsuitable Reasons`
 - `AI CV PDF`
 
@@ -197,9 +198,19 @@ ASCII letters, numbers, and underscores so applicant websites are less likely
 to reject the upload.
 
 Each CV is compiled in its own temporary directory with `latexmk -xelatex`.
-`JOB_EVAL_CV_PHOTO_FILE` defaults to `cv/photo.jpg`; when present, it is copied
+`JOB_EVAL_CV_PHOTO_FILE` defaults to `cv/photo.png`; when present, it is copied
 into the temp directory before compilation. Compilation errors are written to
 `AI CV PDF` for that row and do not stop the evaluator.
+
+Before compilation, the evaluator restores locked header data, Ausbildung
+(except validated course selections), and languages from the Master CV. Project
+titles select an exact 3–4 project subset; the project blocks themselves are
+always copied from the Master CV. Experience companies and dates are validated.
+
+The PDF page policy is fixed: compile first; if the result exceeds two pages,
+remove the last relevance-ranked project and recompile; if it still exceeds two
+pages, remove the last relevance-ranked experience and recompile. If it remains
+over two pages, retain that version without any further rewriting or removal.
 
 Successful PDFs are uploaded to a new timestamped folder named
 `YYYY-MM-DD_HH-MM-SS` inside the Google Drive folder identified by

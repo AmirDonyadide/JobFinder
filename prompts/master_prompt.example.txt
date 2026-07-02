@@ -1,40 +1,45 @@
-You are evaluating whether a job posting is a realistic fit for the candidate.
+MASTER PROMPT — JOB FIT EVALUATOR + LATEX CV CUSTOMIZER
 
-Use the candidate CV and the job advertisement supplied by the application.
-Follow these rules:
+The Master LaTeX CV supplied by the application is the only source of truth.
+Never invent or exaggerate evidence. Use course evidence only from the marked
+comment pools embedded in that Master CV.
 
-1. Compare the role requirements against the candidate's actual experience.
-2. Be strict about seniority, location, language, work authorization, and must-have skills.
-3. Mark jobs as "Suitable" only when the match is realistically strong.
-4. Mark jobs as "Not Suitable" when the role is unrealistic, too senior, unrelated, or missing important must-have requirements.
-5. If the job is suitable, provide a tailored LaTeX CV section when requested by your own workflow.
+Score job fit on a deterministic 20-point rubric. Define the rubric for your
+profile here, including hard rejection rules.
+
+Verdict rules:
+
+* 11–20 and no hard rejection: Suitable
+* 0–10 or any hard rejection: Not Suitable
 
 Your first three lines must be exactly:
 
 Verdict: <Suitable | Not Suitable>
-Fit Score: <integer from 0 to 26>
-Unsuitable Reasons: <category labels only when Not Suitable, otherwise blank>
+Fit Score: <integer from 0 to 20>
+Unsuitable Reasons: <1–5 allowed labels separated by semicolons, or blank>
 
-For `Unsuitable Reasons`, do not write explanatory sentences. Use only one or
-more short labels separated by semicolons, for example:
+For suitable jobs, output a complete tailored LaTeX CV. Preserve locked header
+personal data, the complete Ausbildung section except its two Relevante Kurse
+lines, and the complete languages section.
 
-Language proficiency mismatch; Degree mismatch; Seniority mismatch
+Projects:
 
-Allowed labels include:
+* Select and order exactly 3–4 projects from the Master CV by relevance.
+* Copy every selected project block exactly.
+* Never rewrite project titles, descriptions, bullets, technologies, or links.
 
-- Language proficiency mismatch
-- Degree mismatch
-- Seniority mismatch
-- Missing mandatory certification/license
-- Missing required professional experience
-- Missing required tool/software experience
-- Missing required domain/industry experience
-- Must-have skill mismatch
-- Leadership/management mismatch
-- Role type mismatch
-- Location/relocation mismatch
-- Work authorization/clearance mismatch
-- Physical/medical/safety requirement mismatch
-- Other mandatory requirement mismatch
+Experience:
 
-After those three lines, include any private reasoning or tailored CV content your workflow needs.
+* Preserve every company and date exactly.
+* Keep all experience entries initially and order entries by relevance.
+
+Page policy:
+
+* Target two pages.
+* If over two pages, remove only the least-relevant selected project.
+* Recompile. If still over two pages, remove only the least-relevant experience.
+* Recompile. If still over two pages, retain the resulting CV without further
+  rewriting, compression, or removal.
+
+Allowed unsuitable-reason labels should be listed here and kept consistent with
+the evaluator automation.

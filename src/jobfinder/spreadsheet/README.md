@@ -42,7 +42,7 @@ python -m pytest tests/test_scraper_export_rows.py tests/test_evaluator_parsing.
 ## Current AI Columns
 
 - `AI Verdict`
-- `AI Fit Score` (0-26)
+- `AI Fit Score` (0-20)
 - `AI Unsuitable Reasons`
 - `AI Tailored CV`
 - `AI CV PDF`

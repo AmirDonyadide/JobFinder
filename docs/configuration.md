@@ -136,7 +136,7 @@ than 30 days omit `date_posted` and rely on post-scrape filtering.
 | `JOB_EVAL_OPENAI_TIMEOUT` | `120` | OpenAI request timeout (seconds). |
 | `JOB_EVAL_MAX_OUTPUT_TOKENS` | `9000` | Max tokens per model response (minimum `500`). |
 | `JOB_EVAL_CV_PDF_OUTPUT` | `true` | Compile generated LaTeX CVs to PDFs and upload them to Drive. |
-| `JOB_EVAL_CV_PHOTO_FILE` | `cv/photo.jpg` | Optional photo copied into each isolated LaTeX build directory. |
+| `JOB_EVAL_CV_PHOTO_FILE` | `cv/photo.png` | Optional photo copied into each isolated LaTeX build directory. |
 | `JOB_EVAL_CV_PDF_TIMEOUT` | `120` | Max seconds for one LaTeX PDF compilation. |
 | `JOB_EVAL_CV_DRIVE_FOLDER_ID` | blank | Drive folder ID for timestamped PDF folders. Required when PDF output is on. |
 | `JOB_EVAL_CV_PDF_APPLICANT_NAME` | `Applicant` | Name used in upload-safe PDF filenames. |
@@ -144,6 +144,7 @@ than 30 days omit `date_posted` and rely on post-scrape filtering.
 | `JOB_EVAL_LARGE_QUEUE_SLEEP_MS` | `2000` | Delay between request starts when pacing is enabled. |
 | `JOB_EVAL_SAVE_BATCH_SIZE` | `1` | Completed evaluations saved per write. `1` preserves row-by-row crash recovery. |
 | `JOB_EVAL_UNSUITABLE_ROW_POLICY` | `single_label_only` | `single_label_only` or `keep_all`. |
+| `JOB_EVAL_CV_MAX_PAGES` | `2` | Fixed Master-CV page target. Values other than `2` are rejected. |
 
 **Unsuitable-row policy:**
 
@@ -219,16 +220,3 @@ above:
 | `GOOGLE_API_TIMEOUT_SECONDS` | `120` | HTTP timeout for Google API calls. |
 | `GOOGLE_API_RETRIES` | `3` | Retries for Google API calls. |
 | `JOBFINDER_PIPELINE_STEP_TIMEOUT_SECONDS` | `21600` | Per-step timeout for each pipeline child process (6 hours). `0` disables it. |
-
-## Settings that need confirmation
-
-These appear in `.env.example` but seem to conflict with the rest of the project.
-Confirm against the code before relying on them:
-
-- **`JOB_EVAL_CV_DRIVE_PARENT_FOLDER`** (in `.env.example`) — not referenced in any
-  README table. The documented Drive setting is `JOB_EVAL_CV_DRIVE_FOLDER_ID`.
-  *Needs confirmation that this is still used.*
-- **`google_service_account.json` / Sheets service-account key** — a comment in
-  `.env.example` mentions a service-account key, but the rest of the project
-  documents an **OAuth-only** flow using `google_token.json`. *Likely a stale
-  comment; needs confirmation.*

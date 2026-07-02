@@ -12,6 +12,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from jobfinder.evaluator.cv_contract import (
+    remove_least_relevant_experience,
+    remove_least_relevant_project,
+)
 from jobfinder.evaluator.latex import LatexCompilationResult, compile_latex_to_pdf
 from jobfinder.evaluator.models import EvaluationError, JobEvaluation, JobRecord
 from jobfinder.evaluator.parsing import looks_like_latex_cv
@@ -28,7 +32,6 @@ LOGGER = logging.getLogger("job_fit_evaluator")
 DEFAULT_DRIVE_PARENT_FOLDER_ID = ""
 DEFAULT_CV_PDF_APPLICANT_NAME = "Applicant"
 DEFAULT_CV_MAX_PAGES = 2
-DEFAULT_CV_MAX_SHORTEN_ATTEMPTS = 2
 ERROR_CELL_LIMIT = 4000
 INVALID_FILENAME_CHARS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
 SAFE_FILENAME_TOKEN_RE = re.compile(r"[^A-Za-z0-9]+")
@@ -75,8 +78,7 @@ class CvPdfRunResult:
 
 CompileLatexFunc = Callable[..., LatexCompilationResult]
 UploadPdfFunc = Callable[..., Any]
-# (current_latex, current_page_count) -> shortened_latex — raises on failure
-ShortenLatexFunc = Callable[[str, int], str]
+TransformLatexFunc = Callable[[str], str]
 
 
 def build_evaluator_google_drive_service() -> Any:
@@ -229,15 +231,10 @@ def generate_cv_pdf_outputs(
     compile_latex: CompileLatexFunc = compile_latex_to_pdf,
     upload_pdf: UploadPdfFunc = upload_pdf_to_drive,
     max_page_limit: int = DEFAULT_CV_MAX_PAGES,
-    shorten_latex: ShortenLatexFunc | None = None,
-    max_shorten_attempts: int = DEFAULT_CV_MAX_SHORTEN_ATTEMPTS,
+    remove_project: TransformLatexFunc = remove_least_relevant_project,
+    remove_experience: TransformLatexFunc = remove_least_relevant_experience,
 ) -> CvPdfRunResult:
-    """Compile generated CVs, upload PDFs to Drive, and return sheet values.
-
-    When ``shorten_latex`` is provided and a compiled CV exceeds
-    ``max_page_limit`` pages, the LaTeX is sent to ``shorten_latex`` and
-    recompiled.  This repeats up to ``max_shorten_attempts`` times.
-    """
+    """Compile CVs and apply the fixed project-then-experience overflow policy."""
     candidates = assign_cv_ids(
         records,
         evaluations,
@@ -275,8 +272,8 @@ def generate_cv_pdf_outputs(
                 timeout_seconds=timeout_seconds,
                 compile_latex=compile_latex,
                 max_page_limit=max_page_limit,
-                shorten_latex=shorten_latex,
-                max_shorten_attempts=max_shorten_attempts,
+                remove_project=remove_project,
+                remove_experience=remove_experience,
             )
 
             if not compile_result.success or compile_result.pdf_path is None:
@@ -322,82 +319,70 @@ def _compile_with_page_limit(
     timeout_seconds: int,
     compile_latex: CompileLatexFunc,
     max_page_limit: int,
-    shorten_latex: ShortenLatexFunc | None,
-    max_shorten_attempts: int,
+    remove_project: TransformLatexFunc,
+    remove_experience: TransformLatexFunc,
 ) -> LatexCompilationResult:
-    """Compile a CV PDF, shortening the LaTeX if it exceeds max_page_limit pages.
+    """Compile, remove one project, then one experience, recompiling each time."""
+    if max_page_limit != DEFAULT_CV_MAX_PAGES:
+        return LatexCompilationResult(
+            success=False,
+            error="The Master CV contract requires an exact two-page target.",
+        )
 
-    On each iteration:
-    1. Compile the current LaTeX.
-    2. If compilation failed, return the failure result immediately.
-    3. If the page count is within the limit (or unknown), return success.
-    4. Otherwise call ``shorten_latex`` and loop — up to ``max_shorten_attempts``
-       times.  After exhausting attempts, return the last successful compilation
-       even if it still exceeds the page limit.
-    """
     current_latex = candidate.latex
-    last_result: LatexCompilationResult | None = None
+    stages: tuple[tuple[str, TransformLatexFunc] | None, ...] = (
+        None,
+        ("least-relevant project", remove_project),
+        ("least-relevant experience", remove_experience),
+    )
 
-    for attempt in range(max_shorten_attempts + 1):
+    for stage_index, stage in enumerate(stages):
+        if stage is not None:
+            label, transform = stage
+            try:
+                current_latex = transform(current_latex)
+            except Exception as exc:
+                return LatexCompilationResult(
+                    success=False,
+                    error=f"Could not remove the {label} without rewriting: {exc}",
+                )
+            LOGGER.info(
+                "Row %s (%s): removed one %s and recompiling.",
+                candidate.row_number,
+                candidate.display_name,
+                label,
+            )
+
         result = compile_latex(
             current_latex,
             pdf_path,
             photo_path=photo_path,
             timeout_seconds=timeout_seconds,
         )
-        last_result = result
-
         if not result.success or result.pdf_path is None:
             return result
 
         page_count = result.page_count
-
-        # Accept when: page count unknown, within limit, or no shortener wired up.
-        if page_count is None or page_count <= max_page_limit or shorten_latex is None:
-            if page_count is not None and page_count > max_page_limit:
-                LOGGER.warning(
-                    "Row %s (%s): CV is %s page(s) but no shortener is configured "
-                    "(max_page_limit=%s). Uploading as-is.",
-                    candidate.row_number,
-                    candidate.display_name,
-                    page_count,
-                    max_page_limit,
-                )
+        if page_count is None:
+            return LatexCompilationResult(
+                success=False,
+                error=(
+                    "LaTeX compiled, but its page count could not be determined; "
+                    "the two-page contract cannot be enforced safely."
+                ),
+                stdout=result.stdout,
+                stderr=result.stderr,
+            )
+        if page_count <= max_page_limit:
             return result
-
-        # Page count exceeds limit and shortener is available.
-        if attempt >= max_shorten_attempts:
+        if stage_index == len(stages) - 1:
             LOGGER.warning(
-                "Row %s (%s): CV is still %s page(s) after %s shortening "
-                "attempt(s) (limit %s). Uploading current version.",
+                "Row %s (%s): CV remains %s page(s) after removing one project "
+                "and one experience. Keeping this version as required.",
                 candidate.row_number,
                 candidate.display_name,
                 page_count,
-                max_shorten_attempts,
-                max_page_limit,
             )
             return result
 
-        LOGGER.info(
-            "Row %s (%s): CV compiled to %s page(s) (limit %s). "
-            "Requesting AI shortening (attempt %s/%s) ...",
-            candidate.row_number,
-            candidate.display_name,
-            page_count,
-            max_page_limit,
-            attempt + 1,
-            max_shorten_attempts,
-        )
-        try:
-            current_latex = shorten_latex(current_latex, page_count)
-        except Exception as exc:
-            LOGGER.warning(
-                "Row %s (%s): CV shortening failed: %s. Uploading current version.",
-                candidate.row_number,
-                candidate.display_name,
-                exc,
-            )
-            return result
-
-    # Unreachable but satisfies the type checker.
-    return last_result  # type: ignore[return-value]
+    raise AssertionError("unreachable page-limit stage")

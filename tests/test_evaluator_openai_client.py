@@ -24,7 +24,7 @@ class FakeEvaluator:
         return JobEvaluation(
             row_number=record.row_number,
             verdict="Suitable",
-            fit_score=24,
+            fit_score=18,
             reason=f"Evaluated {record.display_name}",
             model=self.model,
         )
@@ -103,7 +103,7 @@ def test_openai_evaluator_restores_master_education_section(monkeypatch):
 
     def fake_call_openai(prompt: str, record: JobRecord) -> str:
         return r"""Verdict: Suitable
-Fit Score: 24
+Fit Score: 18
 Unsuitable Reasons:
 
 Customized CV (LaTeX):
@@ -166,14 +166,14 @@ def test_openai_evaluator_retries_suitable_response_missing_cv(monkeypatch):
     evaluator.model = "test-model"
     responses = [
         """Verdict: Suitable
-Fit Score: 21
+Fit Score: 16
 Unsuitable Reasons:
 
 Why it fits:
 - Solid GIS match.
 """,
         r"""Verdict: Suitable
-Fit Score: 21
+Fit Score: 16
 Unsuitable Reasons:
 
 Customized CV (LaTeX):
