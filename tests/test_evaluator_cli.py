@@ -40,6 +40,14 @@ def test_arg_parser_accepts_google_sheet_id_option():
     assert args.google_sheet_id == "spreadsheet-id"
 
 
+def test_arg_parser_accepts_pdf_only_recovery_mode():
+    parser = build_arg_parser(EnvSettings({}))
+
+    args = parser.parse_args(["--pdf-only"])
+
+    assert args.pdf_only is True
+
+
 def test_parse_unsuitable_row_policy_controls_final_filtering():
     """The evaluator should support keeping all rows or filtering rejections."""
     filtered = parse_unsuitable_row_policy("")

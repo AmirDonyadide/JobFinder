@@ -203,6 +203,57 @@ def extract_job_records(
     return records, skipped_existing
 
 
+def extract_pending_cv_pdf_records(
+    headers: list[str],
+    rows: list[list[Any]],
+) -> tuple[list[JobRecord], dict[int, JobEvaluation]]:
+    """Return suitable stored CVs that still need a successful PDF link."""
+    header_map = build_header_map(headers)
+    verdict_idx = header_map.get(normalize_header("AI Verdict"))
+    tailored_cv_idx = header_map.get(normalize_header("AI Tailored CV"))
+    cv_pdf_idx = header_map.get(normalize_header("AI CV PDF"))
+    if verdict_idx is None or tailored_cv_idx is None:
+        return [], {}
+
+    records: list[JobRecord] = []
+    evaluations: dict[int, JobEvaluation] = {}
+    for row_number, row in enumerate(rows, start=2):
+        verdict = clean_cell_text(get_row_value(row, verdict_idx))
+        if verdict.casefold() != "suitable":
+            continue
+
+        # Preserve the original newlines and spacing: collapsing whitespace here
+        # would corrupt comments, commands, and paragraph boundaries in LaTeX.
+        tailored_cv = str(get_row_value(row, tailored_cv_idx) or "").strip()
+        if not looks_like_latex_cv(tailored_cv):
+            continue
+
+        cv_pdf = (
+            clean_cell_text(get_row_value(row, cv_pdf_idx))
+            if cv_pdf_idx is not None
+            else ""
+        )
+        if cv_pdf.casefold().startswith(("https://", "http://")):
+            continue
+
+        record = JobRecord(
+            row_number=row_number,
+            display_name=display_name_for_row(headers, row, row_number),
+            advertisement="",
+        )
+        records.append(record)
+        evaluations[row_number] = JobEvaluation(
+            row_number=row_number,
+            verdict="Suitable",
+            fit_score=None,
+            reason="",
+            tailored_cv=tailored_cv,
+            cv_pdf=cv_pdf,
+        )
+
+    return records, evaluations
+
+
 def read_text_asset(path: Path, label: str) -> str:
     """Read a required prompt or CV text asset from disk."""
     if not path.exists():

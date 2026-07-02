@@ -13,6 +13,7 @@ from jobfinder.evaluator.latex import (
     compile_latex_to_pdf,
     parse_page_count_from_output,
     prepare_latex_for_xelatex,
+    repair_reported_misplaced_ampersand,
 )
 from jobfinder.evaluator.models import JobEvaluation, JobRecord
 from jobfinder.evaluator.pdf_output import (
@@ -233,6 +234,53 @@ def test_compile_latex_to_pdf_runs_normalized_xelatex_source(tmp_path):
     assert output_pdf.exists()
 
 
+def test_repair_reported_misplaced_ampersand_only_changes_rejected_line():
+    source = "First & unchanged\nData & Visualization\nLast & unchanged\n"
+    compiler_log = "./cv.tex:2: Misplaced alignment tab character &."
+
+    repaired = repair_reported_misplaced_ampersand(source, compiler_log)
+
+    assert repaired == "First & unchanged\nData \\& Visualization\nLast & unchanged\n"
+
+
+def test_compile_latex_to_pdf_retries_reported_bare_ampersand(tmp_path):
+    calls: list[str] = []
+
+    def fake_runner(command, *, cwd, **kwargs):
+        source = (Path(cwd) / "cv.tex").read_text(encoding="utf-8")
+        calls.append(source)
+        if len(calls) == 1:
+            line_number = next(
+                index
+                for index, line in enumerate(source.splitlines(), start=1)
+                if "Data & Visualization" in line
+            )
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                f"./cv.tex:{line_number}: Misplaced alignment tab character &.",
+                "",
+            )
+        (Path(cwd) / "cv.pdf").write_bytes(b"%PDF-1.7\n")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            "Output written on cv.pdf (1 page, 10 bytes).",
+            "",
+        )
+
+    result = compile_latex_to_pdf(
+        "\\documentclass{article}\n\\begin{document}\nData & Visualization\n"
+        "\\end{document}",
+        tmp_path / "cv.pdf",
+        runner=fake_runner,
+    )
+
+    assert result.success is True
+    assert len(calls) == 2
+    assert "Data \\& Visualization" in calls[1]
+
+
 def test_drive_run_folder_name_uses_required_format():
     """Drive run folder names should use sortable timestamps."""
     assert drive_run_folder_name(datetime(2026, 5, 20, 9, 8, 7)) == (
@@ -289,20 +337,43 @@ def test_generate_cv_pdf_outputs_creates_drive_folder_and_links(tmp_path):
     assert uploads[0][2] == "2_CV_Applicant_GIS_Analyst_Acme.pdf"
 
 
+def test_generate_cv_pdf_outputs_checkpoints_each_result(tmp_path):
+    service = FakeDriveService()
+    records = [JobRecord(2, "GIS Analyst / Acme", "job")]
+    evaluations = {2: JobEvaluation(2, "Suitable", 18, "Match", tailored_cv=LATEX_CV)}
+    checkpoints: list[tuple[int, str]] = []
+
+    result = generate_cv_pdf_outputs(
+        records,
+        evaluations,
+        drive_service=service,
+        parent_folder_id="parent-folder-id",
+        now=datetime(2026, 7, 2, 18, 30, 0),
+        compile_latex=_make_compile_stub([2]),
+        upload_pdf=_fake_upload,
+        on_output=lambda row_number, value: checkpoints.append((row_number, value)),
+    )
+
+    assert checkpoints == [(2, result.outputs[2])]
+
+
 def test_generate_cv_pdf_outputs_requires_drive_folder_id():
     """PDF output should clearly report a missing Drive folder ID."""
     records = [JobRecord(2, "GIS Analyst / Acme", "Job Title: GIS Analyst")]
     evaluations = {2: JobEvaluation(2, "Suitable", 18, "Match", tailored_cv=LATEX_CV)}
 
+    checkpoints: list[tuple[int, str]] = []
     result = generate_cv_pdf_outputs(
         records,
         evaluations,
         drive_service=FakeDriveService(),
+        on_output=lambda row_number, value: checkpoints.append((row_number, value)),
     )
 
     assert result.success_count == 0
     assert result.error_count == 1
     assert "Missing Google Drive folder ID" in result.outputs[2]
+    assert checkpoints == [(2, result.outputs[2])]
 
 
 # ---------------------------------------------------------------------------

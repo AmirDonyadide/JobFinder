@@ -188,6 +188,11 @@ OpenAI, Google, or process failure does not erase completed rows.
 
 Final cleanup runs after all queued rows finish.
 
+If a run stops because the OpenAI project has no remaining quota, completed
+suitable rows are still compiled and their PDF cells are saved before the
+evaluator exits. A later resume also discovers suitable LaTeX CVs whose PDF
+cell is blank (or contains an earlier error), so they are not stranded.
+
 ## PDF Output
 
 When `JOB_EVAL_CV_PDF_OUTPUT=true`, suitable rows with generated LaTeX CVs are
@@ -201,6 +206,11 @@ Each CV is compiled in its own temporary directory with `latexmk -xelatex`.
 `JOB_EVAL_CV_PHOTO_FILE` defaults to `cv/photo.png`; when present, it is copied
 into the temp directory before compilation. Compilation errors are written to
 `AI CV PDF` for that row and do not stop the evaluator.
+
+If XeLaTeX reports a misplaced alignment tab for a bare `&`, the compiler
+repairs only the exact rejected source line (`&` to `\&`) and retries once.
+This fixes common AI text escaping mistakes without changing legitimate table
+or alignment separators elsewhere in the document.
 
 Before compilation, the evaluator restores locked header data, Ausbildung
 (except validated course selections), and languages from the Master CV. Project
@@ -216,6 +226,19 @@ Successful PDFs are uploaded to a new timestamped folder named
 `YYYY-MM-DD_HH-MM-SS` inside the Google Drive folder identified by
 `JOB_EVAL_CV_DRIVE_FOLDER_ID`. Drive uploads use the shared OAuth token in
 `google_token.json`.
+
+To recover PDFs without making any OpenAI request, run:
+
+```bash
+python job_fit_evaluator.py --source google_sheets --sheet "TAB NAME" --pdf-only
+```
+
+PDF-only mode writes only `AI CV PDF`; it does not alter stored verdicts,
+scores, or pending unevaluated rows.
+
+PDF links and compilation errors are checkpointed to the sheet in small batches
+during generation. Transient Sheets write failures are retried, limiting any
+recovery rerun to the last small batch rather than the entire PDF run.
 
 ## Rejection Row Policy
 

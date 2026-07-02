@@ -79,6 +79,7 @@ class CvPdfRunResult:
 CompileLatexFunc = Callable[..., LatexCompilationResult]
 UploadPdfFunc = Callable[..., Any]
 TransformLatexFunc = Callable[[str], str]
+OutputCallback = Callable[[int, str], None]
 
 
 def build_evaluator_google_drive_service() -> Any:
@@ -233,6 +234,7 @@ def generate_cv_pdf_outputs(
     max_page_limit: int = DEFAULT_CV_MAX_PAGES,
     remove_project: TransformLatexFunc = remove_least_relevant_project,
     remove_experience: TransformLatexFunc = remove_least_relevant_experience,
+    on_output: OutputCallback | None = None,
 ) -> CvPdfRunResult:
     """Compile CVs and apply the fixed project-then-experience overflow policy."""
     candidates = assign_cv_ids(
@@ -252,8 +254,12 @@ def generate_cv_pdf_outputs(
         )
     except Exception as exc:
         message = error_cell("Google Drive setup failed", str(exc))
+        failure_outputs = {candidate.row_number: message for candidate in candidates}
+        if on_output is not None:
+            for row_number, value in failure_outputs.items():
+                on_output(row_number, value)
         return CvPdfRunResult(
-            outputs={candidate.row_number: message for candidate in candidates},
+            outputs=failure_outputs,
             success_count=0,
             error_count=len(candidates),
         )
@@ -261,6 +267,12 @@ def generate_cv_pdf_outputs(
     outputs: dict[int, str] = {}
     success_count = 0
     error_count = 0
+
+    def record_output(row_number: int, value: str) -> None:
+        outputs[row_number] = value
+        if on_output is not None:
+            on_output(row_number, value)
+
     with tempfile.TemporaryDirectory(prefix="jobfinder_cv_pdfs_") as temp_name:
         output_dir = Path(temp_name)
         for candidate in candidates:
@@ -277,9 +289,12 @@ def generate_cv_pdf_outputs(
             )
 
             if not compile_result.success or compile_result.pdf_path is None:
-                outputs[candidate.row_number] = error_cell(
-                    "LaTeX compilation failed",
-                    compile_result.error,
+                record_output(
+                    candidate.row_number,
+                    error_cell(
+                        "LaTeX compilation failed",
+                        compile_result.error,
+                    ),
                 )
                 error_count += 1
                 continue
@@ -292,14 +307,17 @@ def generate_cv_pdf_outputs(
                     filename=candidate.filename,
                 )
             except Exception as exc:
-                outputs[candidate.row_number] = error_cell(
-                    "Google Drive upload failed",
-                    str(exc),
+                record_output(
+                    candidate.row_number,
+                    error_cell(
+                        "Google Drive upload failed",
+                        str(exc),
+                    ),
                 )
                 error_count += 1
                 continue
 
-            outputs[candidate.row_number] = str(uploaded.web_view_link)
+            record_output(candidate.row_number, str(uploaded.web_view_link))
             success_count += 1
 
     return CvPdfRunResult(
