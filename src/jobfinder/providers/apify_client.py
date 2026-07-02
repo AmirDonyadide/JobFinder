@@ -74,7 +74,7 @@ def json_for_log(value: Any, *, max_chars: int = 4_000) -> str:
     """Serialize diagnostic data without exposing secrets or huge descriptions."""
     try:
         text = json.dumps(redact_for_log(value), ensure_ascii=False, default=str)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         text = repr(redact_for_log(value))
     if len(text) > max_chars:
         return f"{text[:max_chars]}... <truncated {len(text) - max_chars} chars>"
@@ -347,8 +347,7 @@ def wait_for_actor_run(
         if status in APIFY_TERMINAL_STATUSES:
             if status == "SUCCEEDED":
                 LOGGER.info(
-                    "Apify run %s for %s finished with status SUCCEEDED "
-                    "(dataset=%s).",
+                    "Apify run %s for %s finished with status SUCCEEDED (dataset=%s).",
                     run_id,
                     actor_id,
                     run.get("defaultDatasetId") or "unknown",
