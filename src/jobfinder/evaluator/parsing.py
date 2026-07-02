@@ -301,8 +301,8 @@ def build_cv_contract_retry_prompt(
             "```text\n"
             f"{previous_response_text.strip()}\n"
             "```",
-            "% Job Advertisement\n\n" f"{job_advertisement.strip()}",
-            "% Master LaTeX CV\n\n" "```latex\n" f"{latex_cv.strip()}\n" "```",
+            f"% Job Advertisement\n\n{job_advertisement.strip()}",
+            f"% Master LaTeX CV\n\n```latex\n{latex_cv.strip()}\n```",
         ]
     )
 

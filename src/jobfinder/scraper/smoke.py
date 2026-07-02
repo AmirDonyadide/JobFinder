@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 from jobfinder.core.logging import configure_cli_logging
 from jobfinder.env import EnvSettings
@@ -19,6 +19,7 @@ from jobfinder.scraper.settings import (
     STEPSTONE_ACTOR_ID,
     XING_ACTOR_ID,
     ApifyTokenPool,
+    ScraperSettings,
     parse_apify_api_tokens,
 )
 
@@ -38,7 +39,7 @@ def build_smoke_settings(
     max_items: int,
     max_pages: int,
     env: EnvSettings | None = None,
-) -> SimpleNamespace:
+) -> ScraperSettings:
     """Build the minimal settings object needed by all provider adapters."""
     env = env or EnvSettings()
     tokens = parse_apify_api_tokens(env.get(APIFY_API_TOKEN_ENV))
@@ -50,51 +51,59 @@ def build_smoke_settings(
 
     configured_memory = env.get_int("APIFY_RUN_MEMORY_MB", 0)
     memory_mb = max(128, configured_memory) if configured_memory > 0 else 0
-    return SimpleNamespace(
-        apify_api_token=tokens[0],
-        apify_api_tokens=tokens,
-        apify_token_pool=ApifyTokenPool(tokens),
-        apify_run_timeout_seconds=max(
-            60,
-            env.get_int("APIFY_RUN_TIMEOUT_SECONDS", 900),
+    # The smoke CLI intentionally builds only the settings consumed by provider
+    # adapters. Cast the structural test double at this single boundary so the
+    # production provider APIs retain their concrete ScraperSettings contract.
+    return cast(
+        ScraperSettings,
+        SimpleNamespace(
+            apify_api_token=tokens[0],
+            apify_api_tokens=tokens,
+            apify_token_pool=ApifyTokenPool(tokens),
+            apify_run_timeout_seconds=max(
+                60,
+                env.get_int("APIFY_RUN_TIMEOUT_SECONDS", 900),
+            ),
+            apify_run_memory_mb=memory_mb,
+            apify_client_timeout_seconds=max(
+                1,
+                env.get_int("APIFY_CLIENT_TIMEOUT_SECONDS", 120),
+            ),
+            location=location,
+            geo_id="101282230"
+            if location.casefold() in {"germany", "deutschland"}
+            else "",
+            experience_levels=[],
+            contract_types=[],
+            published_at="r604800",
+            max_results_per_search=max_items,
+            scrape_company_details=False,
+            split_by_location=False,
+            split_country="DE",
+            indeed_country="DE",
+            indeed_location=location,
+            indeed_max_results_per_search=max_items,
+            stepstone_location=location,
+            stepstone_category="",
+            stepstone_start_urls=[],
+            stepstone_max_results_per_search=max_items,
+            stepstone_max_concurrency=min(5, max_items),
+            stepstone_min_concurrency=1,
+            stepstone_max_request_retries=3,
+            stepstone_use_apify_proxy=True,
+            stepstone_proxy_groups=["RESIDENTIAL"],
+            xing_location=location,
+            xing_date_posted="LAST_WEEK",
+            xing_start_url="",
+            xing_max_results_per_search=max_items,
+            xing_max_pages=max_pages,
         ),
-        apify_run_memory_mb=memory_mb,
-        apify_client_timeout_seconds=max(
-            1,
-            env.get_int("APIFY_CLIENT_TIMEOUT_SECONDS", 120),
-        ),
-        location=location,
-        geo_id="101282230" if location.casefold() in {"germany", "deutschland"} else "",
-        experience_levels=[],
-        contract_types=[],
-        published_at="r604800",
-        max_results_per_search=max_items,
-        scrape_company_details=False,
-        split_by_location=False,
-        split_country="DE",
-        indeed_country="DE",
-        indeed_location=location,
-        indeed_max_results_per_search=max_items,
-        stepstone_location=location,
-        stepstone_category="",
-        stepstone_start_urls=[],
-        stepstone_max_results_per_search=max_items,
-        stepstone_max_concurrency=min(5, max_items),
-        stepstone_min_concurrency=1,
-        stepstone_max_request_retries=3,
-        stepstone_use_apify_proxy=True,
-        stepstone_proxy_groups=["RESIDENTIAL"],
-        xing_location=location,
-        xing_date_posted="LAST_WEEK",
-        xing_start_url="",
-        xing_max_results_per_search=max_items,
-        xing_max_pages=max_pages,
     )
 
 
 def build_payload(
     platform: str,
-    settings: SimpleNamespace,
+    settings: ScraperSettings,
     keyword: str,
 ) -> dict[str, Any]:
     """Build one live actor payload without invoking pipeline filters."""
