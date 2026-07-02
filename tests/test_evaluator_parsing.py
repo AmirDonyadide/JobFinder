@@ -7,10 +7,36 @@ from jobfinder.evaluator.parsing import (
     enforce_protected_cv_sections,
     ensure_output_columns,
     extract_job_records,
+    extract_pending_cv_pdf_records,
     parse_model_response,
     row_to_job_advertisement,
 )
 from jobfinder.evaluator.storage import columns_to_remove_after_evaluation
+
+
+def test_extract_pending_cv_pdf_records_recovers_stored_latex_only():
+    headers = [
+        "Job Title",
+        "Company",
+        "AI Verdict",
+        "AI Tailored CV",
+        "AI CV PDF",
+    ]
+    latex = "\\documentclass{article}\n\\begin{document}\nGIS CV\n\\end{document}"
+    rows = [
+        ["GIS Analyst", "Acme", "Suitable", latex, ""],
+        ["GIS Lead", "Beta", "Suitable", latex, "LaTeX compilation failed: old"],
+        ["GIS Dev", "Gamma", "Suitable", latex, "https://drive.example/cv"],
+        ["Sales", "Delta", "Not Suitable", latex, ""],
+        ["Missing", "Echo", "Suitable", "", ""],
+    ]
+
+    records, evaluations = extract_pending_cv_pdf_records(headers, rows)
+
+    assert [record.row_number for record in records] == [2, 3]
+    assert records[0].display_name == "GIS Analyst / Acme"
+    assert evaluations[2].tailored_cv == latex
+    assert evaluations[3].cv_pdf.startswith("LaTeX compilation failed")
 
 
 def test_ensure_output_columns_appends_missing_ai_columns():

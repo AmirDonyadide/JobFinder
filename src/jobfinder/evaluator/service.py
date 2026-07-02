@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -10,19 +12,24 @@ from typing import Any
 from jobfinder.env import EnvSettings
 from jobfinder.evaluator.models import (
     DEFAULT_MODEL,
+    OUTPUT_COLUMNS,
     EvaluationError,
     JobEvaluation,
+    JobRecord,
+    OpenAIQuotaError,
 )
 from jobfinder.evaluator.openai_client import OpenAIJobEvaluator, evaluate_records
 from jobfinder.evaluator.parsing import (
     ensure_output_columns,
     extract_job_records,
+    extract_pending_cv_pdf_records,
     read_text_asset,
 )
 from jobfinder.evaluator.pdf_output import (
     DEFAULT_CV_MAX_PAGES,
     DEFAULT_CV_PDF_APPLICANT_NAME,
     DEFAULT_DRIVE_PARENT_FOLDER_ID,
+    CvPdfRunResult,
     generate_cv_pdf_outputs,
 )
 from jobfinder.evaluator.storage import (
@@ -55,6 +62,8 @@ SOURCE_ALIASES = {
 UNSUITABLE_ROW_POLICY_SINGLE_LABEL_ONLY = "single_label_only"
 UNSUITABLE_ROW_POLICY_KEEP_ALL = "keep_all"
 MAX_EVALUATOR_CONCURRENCY = 32
+CV_PDF_CHECKPOINT_SIZE = 10
+CV_PDF_CHECKPOINT_RETRIES = 3
 UNSUITABLE_ROW_POLICY_ALIASES = {
     "single_label_only": UNSUITABLE_ROW_POLICY_SINGLE_LABEL_ONLY,
     "single-label-only": UNSUITABLE_ROW_POLICY_SINGLE_LABEL_ONLY,
@@ -101,6 +110,7 @@ class EvaluationOptions:
     save_batch_size: int
     unsuitable_row_policy: str
     cv_max_pages: int
+    pdf_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -126,6 +136,7 @@ def options_from_env(
     source_arg: str | None,
     sheet: str,
     google_sheet_id_arg: str,
+    pdf_only: bool = False,
 ) -> EvaluationOptions:
     """Build evaluator options from CLI args plus environment settings."""
     cv_pdf_output = env.get_bool("JOB_EVAL_CV_PDF_OUTPUT", True)
@@ -175,6 +186,7 @@ def options_from_env(
             env.get("JOB_EVAL_UNSUITABLE_ROW_POLICY")
         ),
         cv_max_pages=max(1, env.get_int("JOB_EVAL_CV_MAX_PAGES", DEFAULT_CV_MAX_PAGES)),
+        pdf_only=pdf_only,
     )
 
 
@@ -239,6 +251,8 @@ def validate_runtime_settings(options: EvaluationOptions) -> None:
         raise EvaluationError(
             "JOB_EVAL_CV_MAX_PAGES must be 2 to match the Master CV contract."
         )
+    if options.pdf_only and not options.cv_pdf_output:
+        raise EvaluationError("--pdf-only requires JOB_EVAL_CV_PDF_OUTPUT=true.")
     if options.large_queue_threshold < 0:
         raise EvaluationError("JOB_EVAL_LARGE_QUEUE_THRESHOLD must be 0 or greater.")
     if options.large_queue_sleep_ms < 0:
@@ -306,6 +320,7 @@ def write_outputs(
     cleanup_columns: bool = True,
     remove_rejected_rows: bool = True,
     remove_tailored_cv: bool = False,
+    output_columns: Sequence[str] = OUTPUT_COLUMNS,
 ) -> None:
     """Write evaluator headers and result values back to the selected source."""
     if source == "excel":
@@ -319,6 +334,7 @@ def write_outputs(
             cleanup_columns=cleanup_columns,
             remove_rejected_rows=remove_rejected_rows,
             remove_tailored_cv=remove_tailored_cv,
+            output_columns=output_columns,
         )
     else:
         write_google_output(
@@ -331,15 +347,102 @@ def write_outputs(
             cleanup_columns=cleanup_columns,
             remove_rejected_rows=remove_rejected_rows,
             remove_tailored_cv=remove_tailored_cv,
+            output_columns=output_columns,
         )
+
+
+def generate_and_save_cv_pdf_outputs(
+    options: EvaluationOptions,
+    *,
+    source: str,
+    spreadsheet_id: str,
+    google_service: Any,
+    workbook: Any,
+    worksheet: Any,
+    sheet_name: str,
+    headers: list[str],
+    header_map: dict[str, int],
+    records: Sequence[JobRecord],
+    evaluations: dict[int, JobEvaluation],
+    remove_rejected_rows: bool,
+) -> CvPdfRunResult:
+    """Compile pending CVs and save only their PDF cells."""
+    if not evaluations:
+        return CvPdfRunResult(outputs={}, success_count=0, error_count=0)
+
+    pending_pdf_updates: dict[int, JobEvaluation] = {}
+
+    def flush_pdf_updates() -> None:
+        if not pending_pdf_updates:
+            return
+        updates = dict(pending_pdf_updates)
+        LOGGER.info("Checkpointing %s CV PDF result(s) ...", len(updates))
+        for attempt in range(CV_PDF_CHECKPOINT_RETRIES + 1):
+            try:
+                write_outputs(
+                    options.excel_file,
+                    source,
+                    spreadsheet_id,
+                    google_service,
+                    workbook,
+                    worksheet,
+                    sheet_name,
+                    headers,
+                    header_map,
+                    updates,
+                    cleanup_columns=False,
+                    remove_rejected_rows=remove_rejected_rows,
+                    output_columns=("AI CV PDF",),
+                )
+                pending_pdf_updates.clear()
+                return
+            except Exception:
+                if attempt >= CV_PDF_CHECKPOINT_RETRIES:
+                    raise
+                delay = 2 ** (attempt + 1)
+                LOGGER.warning(
+                    "CV PDF checkpoint write failed; retrying in %ss (%s/%s).",
+                    delay,
+                    attempt + 1,
+                    CV_PDF_CHECKPOINT_RETRIES,
+                    exc_info=True,
+                )
+                time.sleep(delay)
+
+    def checkpoint_pdf_output(row_number: int, value: str) -> None:
+        evaluation = evaluations[row_number]
+        evaluation.cv_pdf = value
+        pending_pdf_updates[row_number] = evaluation
+        if len(pending_pdf_updates) >= CV_PDF_CHECKPOINT_SIZE:
+            flush_pdf_updates()
+
+    try:
+        result = generate_cv_pdf_outputs(
+            records,
+            evaluations,
+            photo_path=resolve_cv_photo_file(options.cv_photo_file),
+            parent_folder_id=options.cv_drive_folder_id,
+            applicant_name=options.cv_pdf_applicant_name,
+            timeout_seconds=options.cv_pdf_compile_timeout,
+            max_page_limit=options.cv_max_pages,
+            on_output=checkpoint_pdf_output,
+        )
+    finally:
+        flush_pdf_updates()
+    if result.run_folder_name:
+        LOGGER.info(
+            "CV PDFs saved: %s uploaded, %s error(s), Drive folder: %s",
+            result.success_count,
+            result.error_count,
+            result.run_folder_name,
+        )
+    return result
 
 
 def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
     """Run the evaluator workflow using resolved options."""
     validate_runtime_settings(options)
 
-    master_prompt = read_text_asset(options.master_prompt_file, "master prompt")
-    latex_cv = read_text_asset(options.cv_file, "LaTeX CV")
     spreadsheet_id = read_google_spreadsheet_id(options.google_sheet_id_arg)
     source = parse_source(options.source_arg, spreadsheet_id, options.env)
 
@@ -353,6 +456,9 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
 
     headers, header_map = ensure_output_columns(headers)
     records, skipped_existing = extract_job_records(headers, rows)
+    pending_pdf_records, pending_pdf_evaluations = extract_pending_cv_pdf_records(
+        headers, rows
+    )
     remove_rejected_rows = should_remove_rejected_rows(options.unsuitable_row_policy)
 
     LOGGER.info("Sheet: %s", sheet_name)
@@ -364,8 +470,62 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
             skipped_existing,
         )
 
+    if options.pdf_only:
+        LOGGER.info(
+            "PDF-only mode: %s stored suitable CV(s) need compilation; "
+            "OpenAI is skipped.",
+            len(pending_pdf_records),
+        )
+        pdf_result = generate_and_save_cv_pdf_outputs(
+            options,
+            source=source,
+            spreadsheet_id=spreadsheet_id,
+            google_service=google_service,
+            workbook=workbook,
+            worksheet=worksheet,
+            sheet_name=sheet_name,
+            headers=headers,
+            header_map=header_map,
+            records=pending_pdf_records,
+            evaluations=pending_pdf_evaluations,
+            remove_rejected_rows=remove_rejected_rows,
+        )
+        return EvaluationSummary(
+            source=source,
+            sheet_name=sheet_name,
+            queued_count=len(pending_pdf_records),
+            skipped_existing_count=skipped_existing,
+            saved_count=len(pdf_result.outputs),
+            suitable_count=len(pending_pdf_records),
+            not_suitable_count=0,
+            error_count=0,
+            cv_pdf_count=pdf_result.success_count,
+            cv_pdf_error_count=pdf_result.error_count,
+            cv_pdf_drive_folder=pdf_result.run_folder_link,
+        )
+
     if not records:
         LOGGER.info("No rows need evaluation. Writing any missing AI headers only.")
+        pdf_result = CvPdfRunResult(outputs={}, success_count=0, error_count=0)
+        if options.cv_pdf_output and pending_pdf_evaluations:
+            LOGGER.info(
+                "Compiling %s stored suitable CV(s) still missing PDF links ...",
+                len(pending_pdf_evaluations),
+            )
+            pdf_result = generate_and_save_cv_pdf_outputs(
+                options,
+                source=source,
+                spreadsheet_id=spreadsheet_id,
+                google_service=google_service,
+                workbook=workbook,
+                worksheet=worksheet,
+                sheet_name=sheet_name,
+                headers=headers,
+                header_map=header_map,
+                records=pending_pdf_records,
+                evaluations=pending_pdf_evaluations,
+                remove_rejected_rows=remove_rejected_rows,
+            )
         write_outputs(
             options.excel_file,
             source,
@@ -378,7 +538,7 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
             header_map,
             {},
             remove_rejected_rows=remove_rejected_rows,
-            remove_tailored_cv=options.cv_pdf_output,
+            remove_tailored_cv=(options.cv_pdf_output and pdf_result.error_count == 0),
         )
         return EvaluationSummary(
             source=source,
@@ -389,7 +549,13 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
             suitable_count=0,
             not_suitable_count=0,
             error_count=0,
+            cv_pdf_count=pdf_result.success_count,
+            cv_pdf_error_count=pdf_result.error_count,
+            cv_pdf_drive_folder=pdf_result.run_folder_link,
         )
+
+    master_prompt = read_text_asset(options.master_prompt_file, "master prompt")
+    latex_cv = read_text_asset(options.cv_file, "LaTeX CV")
 
     api_key = options.env.get("OPENAI_API_KEY")
     if not api_key:
@@ -408,6 +574,7 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
     )
 
     pending_evaluations: dict[int, JobEvaluation] = {}
+    completed_evaluations: dict[int, JobEvaluation] = {}
 
     def flush_pending(*, cleanup_columns: bool = False) -> None:
         if not pending_evaluations:
@@ -430,24 +597,60 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
         pending_evaluations.clear()
 
     def save_evaluation(evaluation: JobEvaluation) -> None:
+        completed_evaluations[evaluation.row_number] = evaluation
         pending_evaluations[evaluation.row_number] = evaluation
         if len(pending_evaluations) >= options.save_batch_size:
             flush_pending()
 
     try:
-        evaluations = evaluate_records(
-            records,
-            evaluator=evaluator,
-            master_prompt=master_prompt,
-            latex_cv=latex_cv,
-            concurrency=options.concurrency,
-            batch_size=options.batch_size,
-            large_queue_threshold=options.large_queue_threshold,
-            large_queue_sleep_ms=options.large_queue_sleep_ms,
-            on_evaluation=save_evaluation,
-        )
-    finally:
-        flush_pending()
+        try:
+            evaluations = evaluate_records(
+                records,
+                evaluator=evaluator,
+                master_prompt=master_prompt,
+                latex_cv=latex_cv,
+                concurrency=options.concurrency,
+                batch_size=options.batch_size,
+                large_queue_threshold=options.large_queue_threshold,
+                large_queue_sleep_ms=options.large_queue_sleep_ms,
+                on_evaluation=save_evaluation,
+            )
+        finally:
+            flush_pending()
+    except OpenAIQuotaError:
+        if options.cv_pdf_output:
+            recoverable_evaluations = {
+                **pending_pdf_evaluations,
+                **completed_evaluations,
+            }
+            recoverable_records = [
+                *pending_pdf_records,
+                *(
+                    record
+                    for record in records
+                    if record.row_number in completed_evaluations
+                ),
+            ]
+            LOGGER.info(
+                "OpenAI quota stopped evaluation; recovering PDF output for %s "
+                "completed suitable candidate(s) before exit.",
+                len(recoverable_evaluations),
+            )
+            generate_and_save_cv_pdf_outputs(
+                options,
+                source=source,
+                spreadsheet_id=spreadsheet_id,
+                google_service=google_service,
+                workbook=workbook,
+                worksheet=worksheet,
+                sheet_name=sheet_name,
+                headers=headers,
+                header_map=header_map,
+                records=recoverable_records,
+                evaluations=recoverable_evaluations,
+                remove_rejected_rows=remove_rejected_rows,
+            )
+        raise
 
     LOGGER.info(
         "Finalizing output columns after %s saved evaluation(s) ...",
@@ -464,53 +667,25 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
                 "then one experience, recompiling after each removal.",
                 options.cv_max_pages,
             )
-        photo_path = resolve_cv_photo_file(options.cv_photo_file)
-
-        pdf_result = generate_cv_pdf_outputs(
-            records,
-            evaluations,
-            photo_path=photo_path,
-            parent_folder_id=options.cv_drive_folder_id,
-            applicant_name=options.cv_pdf_applicant_name,
-            timeout_seconds=options.cv_pdf_compile_timeout,
-            max_page_limit=options.cv_max_pages,
+        pdf_evaluations = {**pending_pdf_evaluations, **evaluations}
+        pdf_records = [*pending_pdf_records, *records]
+        pdf_result = generate_and_save_cv_pdf_outputs(
+            options,
+            source=source,
+            spreadsheet_id=spreadsheet_id,
+            google_service=google_service,
+            workbook=workbook,
+            worksheet=worksheet,
+            sheet_name=sheet_name,
+            headers=headers,
+            header_map=header_map,
+            records=pdf_records,
+            evaluations=pdf_evaluations,
+            remove_rejected_rows=remove_rejected_rows,
         )
         cv_pdf_count = pdf_result.success_count
         cv_pdf_error_count = pdf_result.error_count
         cv_pdf_drive_folder = pdf_result.run_folder_link
-        for row_number, value in pdf_result.outputs.items():
-            evaluations[row_number].cv_pdf = value
-        pdf_updates = {
-            row_number: evaluation
-            for row_number, evaluation in evaluations.items()
-            if evaluation.cv_pdf
-        }
-        if pdf_updates:
-            LOGGER.info(
-                "Saving %s CV PDF link/error update(s) ...",
-                len(pdf_updates),
-            )
-            write_outputs(
-                options.excel_file,
-                source,
-                spreadsheet_id,
-                google_service,
-                workbook,
-                worksheet,
-                sheet_name,
-                headers,
-                header_map,
-                pdf_updates,
-                cleanup_columns=False,
-                remove_rejected_rows=remove_rejected_rows,
-            )
-        if pdf_result.run_folder_name:
-            LOGGER.info(
-                "CV PDFs saved: %s uploaded, %s error(s), Drive folder: %s",
-                cv_pdf_count,
-                cv_pdf_error_count,
-                pdf_result.run_folder_name,
-            )
     else:
         LOGGER.info("CV PDF output is disabled by JOB_EVAL_CV_PDF_OUTPUT.")
 
@@ -527,7 +702,7 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
         {},
         cleanup_columns=True,
         remove_rejected_rows=remove_rejected_rows,
-        remove_tailored_cv=options.cv_pdf_output,
+        remove_tailored_cv=(options.cv_pdf_output and cv_pdf_error_count == 0),
     )
     if source == "excel":
         LOGGER.info(
