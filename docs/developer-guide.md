@@ -28,9 +28,12 @@ conda create -n JobFinder python=3.14 -y
 conda activate JobFinder
 python -m pip install --upgrade pip
 
-# Install the package and the dev tools
+# Install the package and the dev/test tools
 python -m pip install -e .
 python -m pip install -r requirements-dev.txt
+
+# Optional: install the full production integration stack
+python -m pip install -r requirements.txt
 
 # Create your local config
 cp .env.example .env

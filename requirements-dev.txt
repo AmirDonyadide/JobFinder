@@ -1,4 +1,4 @@
--r requirements.txt
+-r requirements-scraper.txt
 
 black>=26.5.1,<27
 mypy>=1.17,<2

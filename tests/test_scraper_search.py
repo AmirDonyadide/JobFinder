@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from types import SimpleNamespace
@@ -10,7 +11,7 @@ from typing import Any
 import pytest
 import requests
 
-from jobfinder.scraper.providers.apify_client import retry_delay_seconds
+from jobfinder.providers.apify_client import json_for_log, retry_delay_seconds
 from jobfinder.scraper.search import (
     ApifyConfigurationError,
     ApifyRunTimeoutError,
@@ -74,14 +75,11 @@ def make_settings() -> SimpleNamespace:
         stepstone_proxy_groups=["RESIDENTIAL"],
         stepstone_start_urls=[],
         xing_location="Germany",
-        xing_discipline="",
-        xing_remote="",
+        xing_date_posted="",
         xing_start_url="",
         xing_max_results_per_search=500,
         xing_max_pages=20,
         xing_max_concurrency=5,
-        xing_use_apify_proxy=True,
-        xing_proxy_groups=["RESIDENTIAL"],
         source_actor_ids={
             "linkedin": "linkedin~actor",
             "indeed": "indeed~actor",
@@ -145,7 +143,7 @@ def test_run_actor_uses_async_api_and_fetches_dataset(monkeypatch):
     assert jobs == [{"title": "GIS Analyst"}]
     assert calls[0] == (
         "POST",
-        "https://api.apify.com/v2/acts/owner~actor/runs",
+        "https://api.apify.com/v2/actors/owner~actor/runs",
         {"timeout": 3600, "memory": 512, "maxItems": 500},
     )
     assert calls[2] == (
@@ -154,6 +152,58 @@ def test_run_actor_uses_async_api_and_fetches_dataset(monkeypatch):
         (("format", "json"), ("limit", 500)),
     )
     assert apify_http_timeout(settings) == 120
+
+
+def test_run_actor_omits_memory_when_using_actor_default(monkeypatch):
+    """Mixed providers should be able to retain their own memory configuration."""
+    settings = make_settings()
+    settings.apify_run_memory_mb = 0
+    post_params = None
+
+    def fake_post(url: str, **kwargs: Any) -> FakeResponse:
+        nonlocal post_params
+        post_params = kwargs.get("params")
+        return FakeResponse({"data": {"id": "run-1", "defaultDatasetId": "data-1"}})
+
+    def fake_get(url: str, **kwargs: Any) -> FakeResponse:
+        if "/actor-runs/" in url:
+            return FakeResponse(
+                {
+                    "data": {
+                        "id": "run-1",
+                        "status": "SUCCEEDED",
+                        "defaultDatasetId": "data-1",
+                    }
+                }
+            )
+        return FakeResponse([])
+
+    monkeypatch.setattr(
+        "jobfinder.scraper.providers.apify_client.requests.post", fake_post
+    )
+    monkeypatch.setattr(
+        "jobfinder.scraper.providers.apify_client.requests.get", fake_get
+    )
+
+    run_actor(settings, "owner~actor", {"input": True}, 10)
+
+    assert post_params == {"timeout": 3600, "maxItems": 10}
+
+
+def test_apify_diagnostic_json_redacts_secrets():
+    """Payload logging must never expose tokens, cookies, or token query values."""
+    logged = json_for_log(
+        {
+            "token": "apify_api_secret",
+            "nested": {"cookie": "session=secret"},
+            "url": "https://example.test/?token=secret&query=GIS",
+        }
+    )
+
+    assert "apify_api_secret" not in logged
+    assert "session=secret" not in logged
+    assert "token=secret" not in logged
+    assert logged.count("<redacted>") == 3
 
 
 def test_run_actor_reports_apify_timed_out_status(monkeypatch):
@@ -462,6 +512,71 @@ def test_run_all_searches_batches_linkedin_when_results_are_attributable(monkeyp
     assert zero_searches == []
     assert failed_sources == {}
     assert skipped_searches == []
+
+
+def test_run_all_searches_logs_keyword_uniqueness_summary(monkeypatch, caplog):
+    """Completed searches should log per-platform keyword uniqueness counts."""
+    settings = make_settings()
+    caplog.set_level(logging.INFO, logger="jobfinder.scraper")
+
+    def fake_run_actor(settings, actor_id, payload, max_items):
+        keyword = payload["keyword"]
+        if keyword == "geodaten":
+            return [
+                {
+                    "title": "GIS Analyst",
+                    "companyName": "GeoCo GmbH",
+                    "location": "Berlin, Germany",
+                },
+                {
+                    "title": "Remote Sensing Specialist",
+                    "companyName": "MapCo",
+                    "location": "Hamburg, Germany",
+                },
+            ]
+        return [
+            {
+                "title": "GIS Analyst (m/f/d)",
+                "companyName": "GeoCo",
+                "location": "Berlin",
+            }
+        ]
+
+    monkeypatch.setattr("jobfinder.scraper.search.run_actor", fake_run_actor)
+
+    run_all_searches(
+        settings,
+        [
+            SearchRequest(
+                source="linkedin",
+                source_label="LinkedIn",
+                keyword="geodaten",
+                display_label="LinkedIn / geodaten",
+                actor_id="curious_coder~linkedin-jobs-scraper",
+                payload={"keyword": "geodaten"},
+                max_items=500,
+            ),
+            SearchRequest(
+                source="linkedin",
+                source_label="LinkedIn",
+                keyword="gis",
+                display_label="LinkedIn / gis",
+                actor_id="curious_coder~linkedin-jobs-scraper",
+                payload={"keyword": "gis"},
+                max_items=500,
+            ),
+        ],
+    )
+
+    assert "Keyword uniqueness summary:" in caplog.text
+    assert (
+        "- LinkedIn / geodaten: 2 total, 1 duplicated with other keywords, "
+        "1 unique only to this keyword (50.0% unique)"
+    ) in caplog.text
+    assert (
+        "- LinkedIn / gis: 1 total, 1 duplicated with other keywords, "
+        "0 unique only to this keyword (0.0% unique)"
+    ) in caplog.text
 
 
 def test_run_all_searches_respects_indeed_source_concurrency(monkeypatch):

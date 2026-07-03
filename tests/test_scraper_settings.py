@@ -191,8 +191,7 @@ def test_load_scraper_settings_reads_xing_defaults_and_overrides(monkeypatch):
         lambda _: {
             "xing_search": {
                 "location": "Germany",
-                "discipline": "",
-                "remote": "Hybrid",
+                "date_posted": "LAST_WEEK",
                 "start_url": "https://www.xing.com/jobs/t-remote?keywords=Remote",
                 "max_pages": 7,
             }
@@ -212,8 +211,7 @@ def test_load_scraper_settings_reads_xing_defaults_and_overrides(monkeypatch):
 
     assert settings.provider_actor_ids["xing"] == "shahidirfan~Xing-Jobs-Scraper"
     assert settings.xing_location == "Germany"
-    assert settings.xing_discipline == ""
-    assert settings.xing_remote == "Hybrid"
+    assert settings.xing_date_posted == "LAST_WEEK"
     assert settings.xing_start_url == (
         "https://www.xing.com/jobs/t-remote?keywords=Remote"
     )
@@ -221,3 +219,31 @@ def test_load_scraper_settings_reads_xing_defaults_and_overrides(monkeypatch):
     assert settings.xing_max_pages == 7
     assert settings.xing_max_concurrency == 3
     assert settings.provider_max_items["xing"] == 75
+
+
+def test_load_scraper_settings_uses_actor_default_memory(monkeypatch):
+    """A missing override should not force one memory size onto every actor."""
+    monkeypatch.setattr("jobfinder.scraper.settings.load_filter_config", lambda _: {})
+    monkeypatch.setattr("jobfinder.scraper.settings.load_keywords", lambda _: ["GIS"])
+
+    settings = load_scraper_settings(
+        EnvSettings({"APIFY_API_TOKEN": "apify_api_real_token"})
+    )
+
+    assert settings.apify_run_memory_mb == 0
+
+
+def test_load_scraper_settings_rejects_invalid_xing_date_filter(monkeypatch):
+    """Invalid values should fail locally instead of being rejected by Apify."""
+    monkeypatch.setattr("jobfinder.scraper.settings.load_filter_config", lambda _: {})
+    monkeypatch.setattr("jobfinder.scraper.settings.load_keywords", lambda _: ["GIS"])
+
+    with pytest.raises(RuntimeError, match="XING_DATE_POSTED"):
+        load_scraper_settings(
+            EnvSettings(
+                {
+                    "APIFY_API_TOKEN": "apify_api_real_token",
+                    "XING_DATE_POSTED": "yesterday",
+                }
+            )
+        )

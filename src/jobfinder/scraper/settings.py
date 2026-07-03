@@ -45,6 +45,7 @@ INDEED_ACTOR_ID = "valig~indeed-jobs-scraper"
 INDEED_MAX_RESULTS_LIMIT = 1000
 STEPSTONE_ACTOR_ID = "memo23~stepstone-search-cheerio-ppr"
 XING_ACTOR_ID = "shahidirfan~Xing-Jobs-Scraper"
+XING_DATE_POSTED_VALUES = {"LAST_24_HOURS", "LAST_WEEK", "LAST_MONTH"}
 
 TOKEN_ENV_VAR = APIFY_API_TOKEN_ENV
 """Backward-compatible alias for the Apify token environment variable name."""
@@ -244,7 +245,6 @@ class ScraperSettings:
     experience_levels: list[str]
     contract_types: list[str]
     scrape_company_details: bool
-    use_incognito_mode: bool
     split_by_location: bool
     split_country: str
     excluded_title_terms: list[str]
@@ -265,14 +265,11 @@ class ScraperSettings:
     stepstone_use_apify_proxy: bool
     stepstone_proxy_groups: list[str]
     xing_location: str
-    xing_discipline: str
-    xing_remote: str
+    xing_date_posted: str
     xing_start_url: str
     xing_max_results_per_search: int
     xing_max_pages: int
     xing_max_concurrency: int
-    xing_use_apify_proxy: bool
-    xing_proxy_groups: list[str]
     source_actor_ids: dict[str, str]
     source_max_items: dict[str, int]
 
@@ -371,7 +368,10 @@ def load_scraper_settings(env: EnvSettings | None = None) -> ScraperSettings:
         filter_config, "final_filters", "max_applicants", 100
     )
 
-    apify_run_memory_mb = max(128, env.get_int("APIFY_RUN_MEMORY_MB", 512))
+    configured_memory_mb = env.get_int("APIFY_RUN_MEMORY_MB", 0)
+    apify_run_memory_mb = (
+        max(128, configured_memory_mb) if configured_memory_mb > 0 else 0
+    )
     apify_memory_limit_mb = max(
         0,
         env.get_int_alias(
@@ -391,7 +391,7 @@ def load_scraper_settings(env: EnvSettings | None = None) -> ScraperSettings:
             ),
         ),
     )
-    if apify_memory_limit_mb:
+    if apify_memory_limit_mb and apify_run_memory_mb:
         search_concurrency = min(
             search_concurrency,
             max(1, apify_memory_limit_mb // apify_run_memory_mb),
@@ -492,11 +492,6 @@ def load_scraper_settings(env: EnvSettings | None = None) -> ScraperSettings:
             "JOBSCRAPER_SCRAPE_COMPANY_DETAILS",
             default=False,
         ),
-        use_incognito_mode=env.get_bool_alias(
-            "JOBFINDER_SCRAPER_USE_INCOGNITO_MODE",
-            "JOBSCRAPER_USE_INCOGNITO_MODE",
-            default=True,
-        ),
         split_by_location=env.get_bool_alias(
             "JOBFINDER_SCRAPER_SPLIT_BY_LOCATION",
             "JOBSCRAPER_SPLIT_BY_LOCATION",
@@ -568,13 +563,11 @@ def load_scraper_settings(env: EnvSettings | None = None) -> ScraperSettings:
             "XING_LOCATION",
             config_str(filter_config, "xing_search", "location", location),
         ),
-        xing_discipline=env.get(
-            "XING_DISCIPLINE",
-            config_str(filter_config, "xing_search", "discipline", ""),
-        ),
-        xing_remote=env.get(
-            "XING_REMOTE",
-            config_str(filter_config, "xing_search", "remote", ""),
+        xing_date_posted=parse_xing_date_posted(
+            env.get(
+                "XING_DATE_POSTED",
+                config_str(filter_config, "xing_search", "date_posted", ""),
+            )
         ),
         xing_start_url=env.get(
             "XING_START_URL",
@@ -591,10 +584,6 @@ def load_scraper_settings(env: EnvSettings | None = None) -> ScraperSettings:
         xing_max_concurrency=min(
             MAX_PROVIDER_CONCURRENCY,
             max(1, env.get_int("XING_MAX_CONCURRENCY", 5)),
-        ),
-        xing_use_apify_proxy=env.get_bool("XING_USE_APIFY_PROXY", True),
-        xing_proxy_groups=parse_env_list(
-            env.get("XING_APIFY_PROXY_GROUPS", "RESIDENTIAL")
         ),
         source_actor_ids={
             "linkedin": LINKEDIN_ACTOR_ID,
@@ -632,6 +621,18 @@ def parse_posted_time_window(value: str | None) -> str:
     raise RuntimeError(
         "Unsupported JOBFINDER_SCRAPER_POSTED_TIME_WINDOW "
         f"{value!r}. Use one of: {allowed}."
+    )
+
+
+def parse_xing_date_posted(value: str | None) -> str:
+    """Validate an optional Xing-native posted-date filter."""
+    normalized = (value or "").strip().upper()
+    if not normalized or normalized in XING_DATE_POSTED_VALUES:
+        return normalized
+    allowed = ", ".join(sorted(XING_DATE_POSTED_VALUES))
+    raise RuntimeError(
+        f"Unsupported XING_DATE_POSTED {value!r}. Use one of: {allowed}, or leave "
+        "it blank to derive the value from the pipeline posted-time window."
     )
 
 
