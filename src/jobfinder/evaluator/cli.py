@@ -66,6 +66,14 @@ def build_arg_parser(env: EnvSettings | None = None) -> argparse.ArgumentParser:
             "google_spreadsheet_id.txt."
         ),
     )
+    parser.add_argument(
+        "--pdf-only",
+        action="store_true",
+        help=(
+            "Compile and upload stored suitable LaTeX CVs that lack PDF links; "
+            "do not call OpenAI or evaluate pending jobs."
+        ),
+    )
     return parser
 
 
@@ -86,6 +94,7 @@ def main() -> int:
             source_arg=args.source,
             sheet=args.sheet,
             google_sheet_id_arg=args.google_sheet_id,
+            pdf_only=args.pdf_only,
         )
         summary = run_evaluation(options)
         write_report_from_env(

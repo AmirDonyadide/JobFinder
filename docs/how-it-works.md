@@ -111,8 +111,17 @@ ID is configured, otherwise Excel).
 6. Call the OpenAI Responses API with strict machine-readable output instructions.
 7. Parse the verdict, fit score, unsuitable reasons, and optional tailored LaTeX CV.
 8. Save each completed evaluation immediately (or in batches via `JOB_EVAL_SAVE_BATCH_SIZE`).
-9. Compile generated CV LaTeX into PDFs, upload them to a timestamped Drive run folder, and write the link (or error) to `AI CV PDF`.
-10. Finalize by removing detail columns such as `Job Description` and the temporary `AI Tailored CV` column.
+9. Enforce the Master-CV contract: restore locked header/Ausbildung/languages,
+   copy selected projects exactly from the Master CV, and validate experience
+   companies and dates.
+10. Compile generated CV LaTeX. If it exceeds two pages, remove one
+    relevance-ranked project and recompile; if still long, remove one
+    relevance-ranked experience and recompile. Never rewrite projects during
+    page handling.
+11. Upload PDFs to a timestamped Drive run folder and write the link (or error)
+    to `AI CV PDF`.
+12. Finalize by removing detail columns such as `Job Description` and the
+    temporary `AI Tailored CV` column.
 11. Apply `JOB_EVAL_UNSUITABLE_ROW_POLICY`.
 
 ## A note on output durability

@@ -332,7 +332,7 @@ def test_final_google_cleanup_removes_multi_label_not_suitable_rows():
                 "Language proficiency mismatch; Degree mismatch",
                 "",
             ],
-            ["Keep suitable", "Description", "Suitable", 90, "", "CV"],
+            ["Keep suitable", "Description", "Suitable", 18, "", "CV"],
         ]
     )
 
@@ -393,6 +393,35 @@ def test_write_google_output_updates_cv_pdf_column():
         "range": f"'Run'!{pdf_letter}2",
         "values": [[drive_link]],
     } in data
+
+
+def test_write_google_output_can_update_only_cv_pdf_column():
+    """PDF recovery must not overwrite existing verdicts or scores."""
+    headers, header_map = ensure_output_columns(["Job Title"])
+    service = FakeGoogleService([headers])
+    evaluation = JobEvaluation(
+        row_number=2,
+        verdict="Suitable",
+        fit_score=None,
+        reason="",
+        cv_pdf="https://drive.google.com/file/d/pdf-id/view",
+    )
+
+    write_google_output(
+        service,
+        "spreadsheet-id",
+        "Run",
+        headers,
+        header_map,
+        {2: evaluation},
+        cleanup_columns=False,
+        output_columns=("AI CV PDF",),
+    )
+
+    data = service.value_updates[0][1]["data"]
+    assert len(data) == 2
+    assert all("AI Verdict" not in str(update) for update in data)
+    assert data[-1]["values"] == [[evaluation.cv_pdf]]
 
 
 def test_final_google_cleanup_can_keep_all_not_suitable_rows():

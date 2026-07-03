@@ -161,7 +161,7 @@ Each run produces a sheet with a stable set of columns:
 | `Job URL` | Link to the posting. |
 | `Apply URL` | Link to the external application page, when available. |
 | `AI Verdict` | Filled by the evaluator (e.g. suitable / not suitable). |
-| `AI Fit Score` | Evaluator score on a 0–26 rubric. |
+| `AI Fit Score` | Evaluator score on a 0–20 rubric; 11–20 is suitable unless a hard rejection applies. |
 | `AI Unsuitable Reasons` | Why a rejected job was not a fit. |
 | `AI CV PDF` | Google Drive link to the tailored CV PDF, or an error for that row. |
 

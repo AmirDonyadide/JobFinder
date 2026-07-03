@@ -167,7 +167,13 @@ def run_scrape(settings: ScraperSettings) -> ScrapeResult:
         LOGGER.info("Max applicants/job: %s.", settings.max_applicants)
     else:
         LOGGER.info("Max applicants/job: no limit.")
-    LOGGER.info("Apify child run memory: %s MB.", settings.apify_run_memory_mb)
+    if settings.apify_run_memory_mb:
+        LOGGER.info(
+            "Apify child run memory override: %s MB.",
+            settings.apify_run_memory_mb,
+        )
+    else:
+        LOGGER.info("Apify child run memory: actor default.")
     LOGGER.info("Apify child run timeout: %ss.", settings.apify_run_timeout_seconds)
     LOGGER.info(
         "Apify transient error retries: %s.",
@@ -229,10 +235,8 @@ def run_scrape(settings: ScraperSettings) -> ScrapeResult:
         LOGGER.info("Xing location: %s.", settings.xing_location)
         if settings.xing_start_url:
             LOGGER.info("Xing direct URL search: configured.")
-        if settings.xing_discipline:
-            LOGGER.info("Xing discipline: %s.", settings.xing_discipline)
-        if settings.xing_remote:
-            LOGGER.info("Xing remote filter: %s.", settings.xing_remote)
+        if settings.xing_date_posted:
+            LOGGER.info("Xing date filter override: %s.", settings.xing_date_posted)
         LOGGER.info(
             "Xing max results/search: %s.",
             settings.xing_max_results_per_search,

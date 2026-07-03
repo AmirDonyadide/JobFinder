@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from jobfinder.evaluator.cv_contract import enforce_master_cv_contract
 from jobfinder.evaluator.models import (
     AI_OUTPUT_COLUMNS,
     OUTPUT_COLUMNS,
@@ -21,7 +22,7 @@ LOGGER = logging.getLogger("job_fit_evaluator")
 
 VERDICT_RE = re.compile(r"(?im)^\s*Verdict\s*:\s*(?P<value>.+?)\s*$")
 FIT_SCORE_RE = re.compile(
-    r"(?im)^\s*Fit\s+Score\s*:\s*(?P<score>\d{1,2})(?:\s*(?:points?|/26|%))?\s*$"
+    r"(?im)^\s*Fit\s+Score\s*:\s*(?P<score>\d{1,2})(?:\s*(?:points?|/20))?\s*$"
 )
 UNSUITABLE_REASONS_LABEL_RE = re.compile(
     r"(?i)^(?:\d+\.\s*)?unsuitable\s+reasons?\s*:\s*(?P<value>.*)$"
@@ -30,26 +31,6 @@ CV_SECTION_RE = re.compile(
     r"(?is)\n?\s*(?:\d+\.\s*)?Customized\s+CV\s*\(LaTeX\)\s*:\s*"
 )
 LATEX_CODE_BLOCK_RE = re.compile(r"(?is)```(?:latex)?\s*(?P<cv>.*?)```")
-LATEX_SECTION_START_RE = re.compile(r"(?m)^[ \t]*\\section\*?\{(?P<title>[^}]+)\}")
-
-PROTECTED_CV_SECTION_TITLES = ("Ausbildung",)
-EDUCATION_SECTION_ALIASES = (
-    "Ausbildung",
-    "Education",
-    "Bildung",
-    "Qualifikation",
-    "Qualifikationen",
-)
-EDUCATION_INSERTION_ANCHORS = (
-    "Berufserfahrung",
-    "Experience",
-    "Projekte",
-    "Projects",
-    "Technische Fähigkeiten",
-    "Technical Skills",
-    "Sprachen",
-    "Languages",
-)
 
 
 def normalize_header(value: Any) -> str:
@@ -222,6 +203,57 @@ def extract_job_records(
     return records, skipped_existing
 
 
+def extract_pending_cv_pdf_records(
+    headers: list[str],
+    rows: list[list[Any]],
+) -> tuple[list[JobRecord], dict[int, JobEvaluation]]:
+    """Return suitable stored CVs that still need a successful PDF link."""
+    header_map = build_header_map(headers)
+    verdict_idx = header_map.get(normalize_header("AI Verdict"))
+    tailored_cv_idx = header_map.get(normalize_header("AI Tailored CV"))
+    cv_pdf_idx = header_map.get(normalize_header("AI CV PDF"))
+    if verdict_idx is None or tailored_cv_idx is None:
+        return [], {}
+
+    records: list[JobRecord] = []
+    evaluations: dict[int, JobEvaluation] = {}
+    for row_number, row in enumerate(rows, start=2):
+        verdict = clean_cell_text(get_row_value(row, verdict_idx))
+        if verdict.casefold() != "suitable":
+            continue
+
+        # Preserve the original newlines and spacing: collapsing whitespace here
+        # would corrupt comments, commands, and paragraph boundaries in LaTeX.
+        tailored_cv = str(get_row_value(row, tailored_cv_idx) or "").strip()
+        if not looks_like_latex_cv(tailored_cv):
+            continue
+
+        cv_pdf = (
+            clean_cell_text(get_row_value(row, cv_pdf_idx))
+            if cv_pdf_idx is not None
+            else ""
+        )
+        if cv_pdf.casefold().startswith(("https://", "http://")):
+            continue
+
+        record = JobRecord(
+            row_number=row_number,
+            display_name=display_name_for_row(headers, row, row_number),
+            advertisement="",
+        )
+        records.append(record)
+        evaluations[row_number] = JobEvaluation(
+            row_number=row_number,
+            verdict="Suitable",
+            fit_score=None,
+            reason="",
+            tailored_cv=tailored_cv,
+            cv_pdf=cv_pdf,
+        )
+
+    return records, evaluations
+
+
 def read_text_asset(path: Path, label: str) -> str:
     """Read a required prompt or CV text asset from disk."""
     if not path.exists():
@@ -293,6 +325,39 @@ def build_missing_cv_retry_prompt(
     )
 
 
+def build_cv_contract_retry_prompt(
+    master_prompt: str,
+    job_advertisement: str,
+    latex_cv: str,
+    previous_response_text: str,
+    contract_error: str,
+) -> str:
+    """Compose one repair request for a structurally invalid tailored CV."""
+    return "\n\n".join(
+        [
+            master_prompt.rstrip(),
+            "%==================================================\n"
+            "% Tailored CV Contract Repair Task\n"
+            "%==================================================\n\n"
+            "The previous Suitable response violated a machine-checked Master CV "
+            "rule. Keep the fit evaluation unchanged and regenerate the complete "
+            "German LaTeX CV from the Master CV. Projects must be an exact 3-4 "
+            "project subset copied without any wording changes. Preserve all "
+            "experience companies and dates, locked header data, Ausbildung, and "
+            "languages. Use only supported courses from the Master CV evidence "
+            f"pools. Contract error: {contract_error}\n\n"
+            "Return the first three machine-readable lines followed by the complete "
+            "Customized CV (LaTeX) code block.",
+            "% Previous Invalid Response\n\n"
+            "```text\n"
+            f"{previous_response_text.strip()}\n"
+            "```",
+            f"% Job Advertisement\n\n{job_advertisement.strip()}",
+            f"% Master LaTeX CV\n\n```latex\n{latex_cv.strip()}\n```",
+        ]
+    )
+
+
 def looks_like_latex_cv(text: str) -> bool:
     """Return true when text appears to be usable LaTeX CV content."""
     candidate = text.strip()
@@ -327,120 +392,12 @@ def extract_latex_cv_from_response(response_text: str) -> str:
     return ""
 
 
-def normalize_latex_section_title(title: str) -> str:
-    """Normalize a LaTeX section title for tolerant matching."""
-    return re.sub(r"\s+", " ", title).strip().casefold()
-
-
-def latex_section_span(
-    latex: str,
-    titles: str | tuple[str, ...],
-) -> tuple[int, int] | None:
-    """Return the start/end indexes for the first matching LaTeX section."""
-    expected_titles = (titles,) if isinstance(titles, str) else titles
-    normalized_titles = {
-        normalize_latex_section_title(title) for title in expected_titles
-    }
-    section_starts = list(LATEX_SECTION_START_RE.finditer(latex))
-
-    for idx, match in enumerate(section_starts):
-        if normalize_latex_section_title(match.group("title")) not in normalized_titles:
-            continue
-
-        end = (
-            section_starts[idx + 1].start()
-            if idx + 1 < len(section_starts)
-            else len(latex)
-        )
-        return match.start(), end
-
-    return None
-
-
-def extract_latex_section(latex: str, title: str) -> str:
-    """Extract one complete LaTeX section by title."""
-    span = latex_section_span(latex, title)
-    if span is None:
-        return ""
-    start, end = span
-    return latex[start:end].strip()
-
-
-def insertion_index_for_latex_section(
-    latex: str,
-    before_titles: tuple[str, ...],
-) -> int:
-    """Find where a missing protected section should be inserted."""
-    normalized_titles = {
-        normalize_latex_section_title(title) for title in before_titles
-    }
-    for match in LATEX_SECTION_START_RE.finditer(latex):
-        if normalize_latex_section_title(match.group("title")) in normalized_titles:
-            return match.start()
-
-    end_document_match = re.search(r"(?m)^[ \t]*\\end\{document\}", latex)
-    if end_document_match:
-        return end_document_match.start()
-
-    return len(latex)
-
-
-def replace_or_insert_latex_section(
-    generated_latex: str,
-    *,
-    source_section: str,
-    generated_titles: tuple[str, ...],
-    insertion_anchors: tuple[str, ...],
-) -> str:
-    """Replace a generated section, or insert it if the model removed it."""
-    generated_span = latex_section_span(generated_latex, generated_titles)
-    if generated_span is None:
-        insertion_index = insertion_index_for_latex_section(
-            generated_latex,
-            insertion_anchors,
-        )
-        prefix = generated_latex[:insertion_index].rstrip()
-        suffix = generated_latex[insertion_index:].lstrip("\n")
-    else:
-        start, end = generated_span
-        prefix = generated_latex[:start].rstrip()
-        suffix = generated_latex[end:].lstrip("\n")
-
-    return "\n\n".join(
-        part for part in (prefix, source_section, suffix) if part
-    ).strip()
-
-
 def enforce_protected_cv_sections(
     generated_latex: str,
     master_latex: str,
-    *,
-    section_titles: tuple[str, ...] = PROTECTED_CV_SECTION_TITLES,
 ) -> str:
-    """Restore protected CV sections from the master CV after model generation."""
-    updated_latex = generated_latex.strip()
-    for section_title in section_titles:
-        source_section = extract_latex_section(master_latex, section_title)
-        if not source_section:
-            continue
-
-        if section_title == "Ausbildung":
-            updated_latex = replace_or_insert_latex_section(
-                updated_latex,
-                source_section=source_section,
-                generated_titles=EDUCATION_SECTION_ALIASES,
-                insertion_anchors=EDUCATION_INSERTION_ANCHORS,
-            )
-            continue
-
-        updated_latex = replace_or_insert_latex_section(
-            updated_latex,
-            source_section=source_section,
-            generated_titles=(section_title,),
-            insertion_anchors=(),
-        )
-
-    return updated_latex
+    """Enforce all locked and source-derived Master CV structures."""
+    return enforce_master_cv_contract(generated_latex, master_latex)
 
 
 def normalize_verdict(raw_value: str) -> str | None:
@@ -573,7 +530,13 @@ def parse_model_response(
     except ValueError:
         score = -1
 
-    if verdict is None or not 0 <= score <= 26:
+    score_is_valid = 0 <= score <= 20
+    verdict_matches_score = (verdict == "Suitable" and 11 <= score <= 20) or (
+        # Hard rejections can make a role Not Suitable even when its raw
+        # component score is above 10.
+        verdict == "Not Suitable" and score_is_valid
+    )
+    if verdict is None or not score_is_valid or not verdict_matches_score:
         return JobEvaluation(
             row_number=row_number,
             verdict="Error",

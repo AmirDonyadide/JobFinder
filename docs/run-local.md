@@ -101,7 +101,7 @@ For a local fork, the important customization points are:
 | Local secrets and runtime tuning | `.env` |
 | Evaluator instructions | `prompts/master_prompt.txt` |
 | Private LaTeX CV | `cv/master_cv.tex` |
-| Optional photo path | `JOB_EVAL_CV_PHOTO_FILE` in `.env`; defaults to `cv/photo.jpg` |
+| Optional photo path | `JOB_EVAL_CV_PHOTO_FILE` in `.env`; defaults to `cv/photo.png` |
 | Applicant name in generated PDF filenames | `JOB_EVAL_CV_PDF_APPLICANT_NAME` |
 | Target Google Sheet | `GOOGLE_SPREADSHEET_ID` or `google_spreadsheet_id.txt` |
 | Target Drive folder for generated CV PDFs | `JOB_EVAL_CV_DRIVE_FOLDER_ID` |
@@ -173,7 +173,7 @@ Then edit:
 | `configs/filters.json` | Search settings, title exclusions, company exclusions, status dropdown values, and applicant cap. |
 | `prompts/master_prompt.txt` | Your evaluator instructions. |
 | `cv/master_cv.tex` | Your private LaTeX CV. |
-| `cv/photo.jpg` | Optional CV photo referenced by LaTeX. Commit it only if it is public. |
+| `cv/photo.png` | Optional CV photo referenced by LaTeX. Commit it only if it is public. |
 
 Do not commit these private files.
 
@@ -211,10 +211,10 @@ Common settings:
 | `JOBFINDER_SCRAPER_APIFY_MEMORY_LIMIT_MB` | `0` | Optional total Apify memory cap used to reduce search concurrency; `0` disables the cap. |
 | `JOBFINDER_SCRAPER_APIFY_BATCH_SIZE` | `1` | Optional LinkedIn search batch size. Keep `1` unless actor results expose source search URLs for attribution. |
 | `JOBFINDER_SCRAPER_MAX_RESULTS_PER_SEARCH` | `500` | Maximum LinkedIn results per keyword. |
-| `JOBFINDER_SCRAPER_POSTED_TIME_WINDOW` | `since_previous_run` | Use `since_previous_run`, `last_24h`, `last_7d`, or `backfill` to control provider posted-time filters. LinkedIn uses second-based windows; Indeed and Stepstone use the closest supported actor day bucket when possible. Xing is filtered after scraping when posted dates are present. |
+| `JOBFINDER_SCRAPER_POSTED_TIME_WINDOW` | `since_previous_run` | Use `since_previous_run`, `last_24h`, `last_7d`, or `backfill` to control provider posted-time filters. LinkedIn uses second-based windows; Indeed, Stepstone, and Xing map to their supported actor buckets when possible. |
 | `JOBFINDER_SCRAPER_SEARCH_WINDOW_BUFFER_SECONDS` | `3600` | Extra search-window padding before exact posted-time filtering, to avoid missing jobs while the run is starting. |
 | `JOBFINDER_SCRAPER_MAX_APPLICANTS` | `100` | Maximum applicants per job after scraping. Use `0` for no limit. |
-| `APIFY_RUN_MEMORY_MB` | `512` | Memory assigned to each Apify actor run. |
+| `APIFY_RUN_MEMORY_MB` | `0` | Optional global memory override. `0` uses each actor's own default and avoids forcing one size across incompatible actors. |
 | `APIFY_RUN_TIMEOUT_SECONDS` | `3600` | Maximum Apify actor runtime per keyword search. |
 | `APIFY_CLIENT_TIMEOUT_SECONDS` | `120` | HTTP timeout for individual Apify API calls while starting, polling, and reading results. |
 | `APIFY_TRANSIENT_ERROR_RETRIES` | `5` | Number of retry attempts for temporary Apify API/run errors before failing the run. |
@@ -233,8 +233,7 @@ Common settings:
 | `STEPSTONE_MAX_CONCURRENCY` | `10` | Maximum pages the Stepstone actor processes concurrently inside a run. |
 | `STEPSTONE_MAX_REQUEST_RETRIES` | `3` | Stepstone actor page retry count. |
 | `XING_LOCATION` | `Germany` | Xing country, city, or region filter for keyword searches. |
-| `XING_DISCIPLINE` | blank | Optional Xing discipline filter. Blank means keyword-only role filtering. |
-| `XING_REMOTE` | blank | Optional Xing remote filter passed through to the actor when set. |
+| `XING_DATE_POSTED` | derived | Optional `LAST_24_HOURS`, `LAST_WEEK`, or `LAST_MONTH` override. |
 | `XING_START_URL` | blank | Optional direct Xing search URL. When set, Xing runs one direct-URL actor search instead of one run per keyword. |
 | `XING_MAX_RESULTS_PER_SEARCH` | `500` | Maximum Xing results per keyword or direct URL run. |
 | `XING_MAX_PAGES` | `20` | Maximum Xing result pages for the actor to process. |
@@ -248,7 +247,8 @@ Common settings:
 | `JOB_EVAL_OPENAI_TIMEOUT` | `120` | OpenAI request timeout in seconds. |
 | `JOB_EVAL_MAX_OUTPUT_TOKENS` | `9000` | Maximum tokens allowed in each evaluation response. |
 | `JOB_EVAL_CV_PDF_OUTPUT` | `true` | Compile generated LaTeX CVs to PDFs and save them to Google Drive. |
-| `JOB_EVAL_CV_PHOTO_FILE` | `cv/photo.jpg` | Optional photo copied into each temporary LaTeX build directory. |
+| `JOB_EVAL_CV_PHOTO_FILE` | `cv/photo.png` | Optional photo copied into each temporary LaTeX build directory. |
+| `JOB_EVAL_CV_MAX_PAGES` | `2` | Fixed Master-CV target; other values are rejected. |
 | `JOB_EVAL_CV_PDF_TIMEOUT` | `120` | Max seconds per LaTeX compilation. |
 | `JOB_EVAL_CV_DRIVE_FOLDER_ID` | blank | Google Drive folder ID for timestamped PDF run folders. Required when PDF output is enabled. |
 | `JOB_EVAL_CV_PDF_APPLICANT_NAME` | `Applicant` | Applicant name used in upload-safe PDF filenames like `12_CV_Applicant_GIS_Analyst_Acme.pdf`. |
@@ -395,7 +395,7 @@ python job_fit_evaluator.py --source excel --sheet latest
   that tab instead of scraping again.
 - Completed evaluations are saved as rows finish, so a later failure keeps already completed rows.
 - By default, final cleanup keeps only one-label `Not Suitable` rows. Set `JOB_EVAL_UNSUITABLE_ROW_POLICY=keep_all` to preserve all evaluated rows.
-- After evaluation with PDF output enabled, the final AI columns are `AI Verdict`, `AI Fit Score` (0-26), `AI Unsuitable Reasons`, and `AI CV PDF`; the temporary `AI Tailored CV` column is removed during final cleanup.
+- After evaluation with PDF output enabled, the final AI columns are `AI Verdict`, `AI Fit Score` (0-20), `AI Unsuitable Reasons`, and `AI CV PDF`; the temporary `AI Tailored CV` column is removed during final cleanup.
 - `AI CV PDF` contains a Google Drive PDF link on success, or a LaTeX/Drive error for that row.
 
 ## 8. Troubleshooting Local Runs
@@ -437,7 +437,7 @@ google_spreadsheet_id.txt
 configs/keywords.txt
 prompts/master_prompt.txt
 cv/master_cv.tex
-cv/photo.jpg  # unless intentionally public
+cv/photo.png  # unless intentionally public
 ```
 
 If you expose `google_token.json`, revoke the OAuth grant in your Google

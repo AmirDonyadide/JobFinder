@@ -17,13 +17,11 @@ def make_settings(**overrides: Any) -> SimpleNamespace:
     """Build the provider settings used by Xing tests."""
     values = {
         "xing_location": "Germany",
-        "xing_discipline": "",
-        "xing_remote": "",
+        "xing_date_posted": "",
         "xing_start_url": "",
         "xing_max_results_per_search": 100,
         "xing_max_pages": 10,
-        "xing_use_apify_proxy": True,
-        "xing_proxy_groups": ["RESIDENTIAL"],
+        "published_at": "r86400",
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -74,12 +72,9 @@ def test_build_actor_input_uses_xing_actor_schema():
     assert payload == {
         "keyword": "GIS analyst",
         "location": "Germany",
+        "date_posted": "LAST_24_HOURS",
         "results_wanted": 25,
         "max_pages": 5,
-        "proxyConfiguration": {
-            "useApifyProxy": True,
-            "apifyProxyGroups": ["RESIDENTIAL"],
-        },
     }
 
 
@@ -95,7 +90,19 @@ def test_build_actor_input_uses_direct_url_without_keyword_filters():
     assert payload["startUrl"] == "https://www.xing.com/jobs/t-remote?keywords=Remote"
     assert "keyword" not in payload
     assert "location" not in payload
-    assert "discipline" not in payload
+    assert "date_posted" not in payload
+
+
+def test_build_actor_input_maps_supported_xing_date_buckets():
+    """Xing should receive only the live actor's exact date enum values."""
+    payload = build_actor_input(make_settings(published_at="r604800"), "GIS")
+    assert payload["date_posted"] == "LAST_WEEK"
+
+    payload = build_actor_input(make_settings(published_at="r2592000"), "GIS")
+    assert payload["date_posted"] == "LAST_MONTH"
+
+    payload = build_actor_input(make_settings(published_at="r2678400"), "GIS")
+    assert "date_posted" not in payload
 
 
 def test_normalize_actor_item_preserves_contract_and_internal_metadata():

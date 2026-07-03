@@ -49,20 +49,20 @@ are still accepted as aliases for the newer `JOBFINDER_SCRAPER_*` names.
 | Variable | Default | Description |
 |---|---:|---|
 | `JOBFINDER_SCRAPER_SEARCH_CONCURRENCY` | `15` | Global searches allowed to run in parallel. |
-| `JOBFINDER_SCRAPER_APIFY_MEMORY_LIMIT_MB` | `0` | Optional total Apify memory budget that can lower effective concurrency. `0` disables the cap. |
+| `JOBFINDER_SCRAPER_APIFY_MEMORY_LIMIT_MB` | `0` | Optional total Apify memory budget that can lower effective concurrency when `APIFY_RUN_MEMORY_MB` is also set. `0` disables the cap. |
 | `JOBFINDER_SCRAPER_APIFY_BATCH_SIZE` | `1` | Optional LinkedIn search batch size. Keep `1` unless actor output provides safe attribution. |
 | `JOBFINDER_SCRAPER_MAX_RESULTS_PER_SEARCH` | `500` | LinkedIn max results per keyword; also the provider fallback. |
 | `JOBFINDER_SCRAPER_POSTED_TIME_WINDOW` | `since_previous_run` | `since_previous_run`, `last_24h`, `last_7d`, or `backfill`. |
 | `JOBFINDER_SCRAPER_SEARCH_WINDOW_BUFFER_SECONDS` | `3600` | Extra search padding when using previous-run windows. |
 | `JOBFINDER_SCRAPER_MAX_APPLICANTS` | from `filters.json` (`100`) | Applicant cap applied after scraping. `0` disables the filter. |
-| `APIFY_RUN_MEMORY_MB` | `512` | Memory assigned to each Apify actor run (minimum `128`). |
+| `APIFY_RUN_MEMORY_MB` | `0` | Optional memory override for every actor run (minimum `128` when set). `0` uses each actor's own default and is recommended for mixed-source runs. |
 | `APIFY_RUN_TIMEOUT_SECONDS` | `3600` | Actor run timeout (minimum `60`). |
 | `APIFY_CLIENT_TIMEOUT_SECONDS` | `120` | HTTP timeout for Apify API calls. |
 | `APIFY_TRANSIENT_ERROR_RETRIES` | `5` | Retries for temporary Apify errors. |
 | `APIFY_RETRY_DELAY_SECONDS` | `30` | Base retry delay (capped at 300s). |
+| `JOBFINDER_LOG_LEVEL` | `INFO` | Set to `DEBUG` to log up to three redacted raw actor rows and parser/filter skip reasons. |
 | `JOBFINDER_SCRAPER_DELAY_BETWEEN_REQUESTS` | `0` | Optional delay between starting searches. |
 | `JOBFINDER_SCRAPER_SCRAPE_COMPANY_DETAILS` | `false` | LinkedIn actor option. |
-| `JOBFINDER_SCRAPER_USE_INCOGNITO_MODE` | `true` | LinkedIn actor option. |
 | `JOBFINDER_SCRAPER_SPLIT_BY_LOCATION` | `false` | LinkedIn actor option. |
 
 ## Indeed
@@ -107,17 +107,15 @@ Used when `JOBFINDER_SCRAPER_SOURCES` includes `xing`.
 | Variable | Default | Description |
 |---|---:|---|
 | `XING_LOCATION` | `filters.json` or LinkedIn location | Country, city, or region filter. |
-| `XING_DISCIPLINE` | blank | Optional discipline filter. Blank means keyword-only filtering. |
-| `XING_REMOTE` | blank | Optional remote filter passed to the actor when set. |
+| `XING_DATE_POSTED` | derived | Optional `LAST_24_HOURS`, `LAST_WEEK`, or `LAST_MONTH` override. Blank maps the pipeline window to the nearest supported value. |
 | `XING_START_URL` | `filters.json` or blank | Optional direct search URL. When set, runs one direct-URL search instead of one per keyword. |
 | `XING_MAX_RESULTS_PER_SEARCH` | `500` | Max results per keyword or direct URL run. |
 | `XING_MAX_PAGES` | `20` | Maximum result pages for the actor to process. |
 | `XING_MAX_CONCURRENCY` | `5` | Cap for simultaneous Xing searches. |
-| `XING_USE_APIFY_PROXY` | `true` | Actor proxy setting. |
-| `XING_APIFY_PROXY_GROUPS` | `RESIDENTIAL` | Comma/newline-separated Apify proxy groups. |
 
-The Xing actor has no posted-time input; posted-window filtering is applied after
-scraping when Xing returns `date_posted` values.
+The deployed Xing schema rejects unknown fields, so JobFinder sends only the
+documented search fields. Proxy selection is left to the actor. Windows longer
+than 30 days omit `date_posted` and rely on post-scrape filtering.
 
 ## Evaluator
 
@@ -138,7 +136,7 @@ scraping when Xing returns `date_posted` values.
 | `JOB_EVAL_OPENAI_TIMEOUT` | `120` | OpenAI request timeout (seconds). |
 | `JOB_EVAL_MAX_OUTPUT_TOKENS` | `9000` | Max tokens per model response (minimum `500`). |
 | `JOB_EVAL_CV_PDF_OUTPUT` | `true` | Compile generated LaTeX CVs to PDFs and upload them to Drive. |
-| `JOB_EVAL_CV_PHOTO_FILE` | `cv/photo.jpg` | Optional photo copied into each isolated LaTeX build directory. |
+| `JOB_EVAL_CV_PHOTO_FILE` | `cv/photo.png` | Optional photo copied into each isolated LaTeX build directory. |
 | `JOB_EVAL_CV_PDF_TIMEOUT` | `120` | Max seconds for one LaTeX PDF compilation. |
 | `JOB_EVAL_CV_DRIVE_FOLDER_ID` | blank | Drive folder ID for timestamped PDF folders. Required when PDF output is on. |
 | `JOB_EVAL_CV_PDF_APPLICANT_NAME` | `Applicant` | Name used in upload-safe PDF filenames. |
@@ -146,6 +144,7 @@ scraping when Xing returns `date_posted` values.
 | `JOB_EVAL_LARGE_QUEUE_SLEEP_MS` | `2000` | Delay between request starts when pacing is enabled. |
 | `JOB_EVAL_SAVE_BATCH_SIZE` | `1` | Completed evaluations saved per write. `1` preserves row-by-row crash recovery. |
 | `JOB_EVAL_UNSUITABLE_ROW_POLICY` | `single_label_only` | `single_label_only` or `keep_all`. |
+| `JOB_EVAL_CV_MAX_PAGES` | `2` | Fixed Master-CV page target. Values other than `2` are rejected. |
 
 **Unsuitable-row policy:**
 
@@ -221,16 +220,3 @@ above:
 | `GOOGLE_API_TIMEOUT_SECONDS` | `120` | HTTP timeout for Google API calls. |
 | `GOOGLE_API_RETRIES` | `3` | Retries for Google API calls. |
 | `JOBFINDER_PIPELINE_STEP_TIMEOUT_SECONDS` | `21600` | Per-step timeout for each pipeline child process (6 hours). `0` disables it. |
-
-## Settings that need confirmation
-
-These appear in `.env.example` but seem to conflict with the rest of the project.
-Confirm against the code before relying on them:
-
-- **`JOB_EVAL_CV_DRIVE_PARENT_FOLDER`** (in `.env.example`) — not referenced in any
-  README table. The documented Drive setting is `JOB_EVAL_CV_DRIVE_FOLDER_ID`.
-  *Needs confirmation that this is still used.*
-- **`google_service_account.json` / Sheets service-account key** — a comment in
-  `.env.example` mentions a service-account key, but the rest of the project
-  documents an **OAuth-only** flow using `google_token.json`. *Likely a stale
-  comment; needs confirmation.*
