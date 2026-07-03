@@ -15,6 +15,11 @@ _PAGE_COUNT_RE = re.compile(
     r"Output written on [^\(]*\(\s*(\d+)\s+pages?\b",
     re.IGNORECASE,
 )
+MISPLACED_AMPERSAND_LINE_RE = re.compile(
+    r"(?m)^(?:\./)?cv\.tex:(?P<line>\d+): "
+    r"Misplaced alignment tab character &\."
+)
+BARE_AMPERSAND_RE = re.compile(r"(?<!\\)&")
 PDFLATEX_ENCODING_PACKAGE_RE = re.compile(
     r"(?m)^[ \t]*\\usepackage(?:\[[^\]]*\])?\{(?:inputenc|fontenc)\}"
     r"[ \t]*(?:%.*)?\n?"
@@ -69,6 +74,25 @@ def prepare_latex_for_xelatex(latex_code: str) -> str:
     prefix = updated[:insert_at]
     suffix = updated[insert_at:].lstrip("\n")
     return "\n".join((prefix.rstrip(), XELATEX_UNICODE_FONT_BLOCK, suffix)).strip()
+
+
+def repair_reported_misplaced_ampersand(latex_code: str, compiler_log: str) -> str:
+    """Escape bare ampersands only on the exact source line XeTeX rejected."""
+    match = MISPLACED_AMPERSAND_LINE_RE.search(compiler_log)
+    if not match:
+        return latex_code
+
+    line_number = int(match.group("line"))
+    lines = latex_code.splitlines(keepends=True)
+    if line_number < 1 or line_number > len(lines):
+        return latex_code
+
+    index = line_number - 1
+    repaired_line = BARE_AMPERSAND_RE.sub(r"\&", lines[index])
+    if repaired_line == lines[index]:
+        return latex_code
+    lines[index] = repaired_line
+    return "".join(lines)
 
 
 SubprocessRunner = Callable[..., subprocess.CompletedProcess[str]]
@@ -186,6 +210,46 @@ def compile_latex_to_pdf(
 
         stdout = completed.stdout or ""
         stderr = completed.stderr or ""
+        if completed.returncode != 0:
+            compiled_source = tex_path.read_text(encoding="utf-8")
+            repaired_source = repair_reported_misplaced_ampersand(
+                compiled_source,
+                "\n".join(part for part in (stdout, stderr) if part),
+            )
+            if repaired_source != compiled_source:
+                tex_path.write_text(repaired_source, encoding="utf-8")
+                try:
+                    completed = runner(
+                        command,
+                        cwd=temp_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout_seconds,
+                        check=False,
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    retry_stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+                    retry_stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+                    return LatexCompilationResult(
+                        success=False,
+                        error=tail_text(
+                            "\n".join(
+                                part
+                                for part in (
+                                    "LaTeX ampersand-repair retry timed out after "
+                                    f"{timeout_seconds}s.",
+                                    retry_stdout,
+                                    retry_stderr,
+                                )
+                                if part
+                            )
+                        ),
+                        stdout=retry_stdout,
+                        stderr=retry_stderr,
+                    )
+                stdout = completed.stdout or ""
+                stderr = completed.stderr or ""
+
         compiled_pdf = temp_dir / "cv.pdf"
         if completed.returncode != 0:
             return LatexCompilationResult(

@@ -7,10 +7,36 @@ from jobfinder.evaluator.parsing import (
     enforce_protected_cv_sections,
     ensure_output_columns,
     extract_job_records,
+    extract_pending_cv_pdf_records,
     parse_model_response,
     row_to_job_advertisement,
 )
 from jobfinder.evaluator.storage import columns_to_remove_after_evaluation
+
+
+def test_extract_pending_cv_pdf_records_recovers_stored_latex_only():
+    headers = [
+        "Job Title",
+        "Company",
+        "AI Verdict",
+        "AI Tailored CV",
+        "AI CV PDF",
+    ]
+    latex = "\\documentclass{article}\n\\begin{document}\nGIS CV\n\\end{document}"
+    rows = [
+        ["GIS Analyst", "Acme", "Suitable", latex, ""],
+        ["GIS Lead", "Beta", "Suitable", latex, "LaTeX compilation failed: old"],
+        ["GIS Dev", "Gamma", "Suitable", latex, "https://drive.example/cv"],
+        ["Sales", "Delta", "Not Suitable", latex, ""],
+        ["Missing", "Echo", "Suitable", "", ""],
+    ]
+
+    records, evaluations = extract_pending_cv_pdf_records(headers, rows)
+
+    assert [record.row_number for record in records] == [2, 3]
+    assert records[0].display_name == "GIS Analyst / Acme"
+    assert evaluations[2].tailored_cv == latex
+    assert evaluations[3].cv_pdf.startswith("LaTeX compilation failed")
 
 
 def test_ensure_output_columns_appends_missing_ai_columns():
@@ -108,7 +134,7 @@ def test_extract_job_records_skips_suitable_rows_with_pdf_link_without_cv():
 def test_parse_model_response_extracts_verdict_score_reason_and_cv():
     """Machine-readable model responses should parse into evaluator fields."""
     response = """Verdict: Suitable
-Fit Score: 22
+    Fit Score: 18
 
 Strong GIS/Python match.
 
@@ -121,7 +147,7 @@ Customized CV (LaTeX):
     result = parse_model_response(response, row_number=7, model="test-model")
 
     assert result.verdict == "Suitable"
-    assert result.fit_score == 22
+    assert result.fit_score == 18
     assert result.reason == "Strong GIS/Python match."
     assert result.tailored_cv == r"\section{Experience}"
     assert result.value_for_column("AI Unsuitable Reasons") == ""
@@ -147,6 +173,40 @@ Unsuitable Reasons: Requires fluent German and senior cloud architecture experie
     assert result.value_for_column("AI Unsuitable Reasons") == (
         "Requires fluent German and senior cloud architecture experience."
     )
+
+
+def test_parse_model_response_enforces_20_point_verdict_boundaries():
+    suitable = parse_model_response(
+        "Verdict: Suitable\nFit Score: 11\nUnsuitable Reasons:",
+        row_number=2,
+        model="test-model",
+    )
+    rejected = parse_model_response(
+        "Verdict: Not Suitable\nFit Score: 10\nUnsuitable Reasons: Role type mismatch",
+        row_number=3,
+        model="test-model",
+    )
+    hard_rejected = parse_model_response(
+        "Verdict: Not Suitable\nFit Score: 15\nUnsuitable Reasons: Seniority mismatch",
+        row_number=6,
+        model="test-model",
+    )
+    contradictory = parse_model_response(
+        "Verdict: Suitable\nFit Score: 10\nUnsuitable Reasons:",
+        row_number=4,
+        model="test-model",
+    )
+    out_of_range = parse_model_response(
+        "Verdict: Suitable\nFit Score: 21\nUnsuitable Reasons:",
+        row_number=5,
+        model="test-model",
+    )
+
+    assert suitable.verdict == "Suitable"
+    assert rejected.verdict == "Not Suitable"
+    assert hard_rejected.verdict == "Not Suitable"
+    assert contradictory.verdict == "Error"
+    assert out_of_range.verdict == "Error"
 
 
 def test_enforce_protected_cv_sections_restores_master_education():

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -197,13 +198,14 @@ def write_excel_output(
     cleanup_columns: bool = True,
     remove_rejected_rows: bool = True,
     remove_tailored_cv: bool = False,
+    output_columns: Sequence[str] = OUTPUT_COLUMNS,
 ) -> None:
     """Write evaluator columns and results back to an Excel worksheet."""
     for col_idx, header in enumerate(headers, start=1):
         worksheet.cell(row=1, column=col_idx).value = header
 
     for evaluation in evaluations.values():
-        for column in OUTPUT_COLUMNS:
+        for column in output_columns:
             column_idx = header_map[normalize_header(column)] + 1
             worksheet.cell(
                 row=evaluation.row_number,
@@ -288,11 +290,12 @@ def write_google_output(
     cleanup_columns: bool = True,
     remove_rejected_rows: bool = True,
     remove_tailored_cv: bool = False,
+    output_columns: Sequence[str] = OUTPUT_COLUMNS,
 ) -> None:
     """Write evaluator columns and results back to a Google Sheet tab."""
     try:
         data = []
-        for column in OUTPUT_COLUMNS:
+        for column in output_columns:
             column_idx = header_map[normalize_header(column)]
             column_letter = get_column_letter(column_idx + 1)
             data.append(

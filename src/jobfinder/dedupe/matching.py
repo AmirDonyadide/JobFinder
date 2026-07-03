@@ -257,4 +257,5 @@ def deduplicate_search_results(
         decisions=decisions,
         input_count=sum(len(jobs) for _, jobs in all_results),
         output_count=len(jobs),
+        clusters=[tuple(cluster) for cluster in clusters],
     )

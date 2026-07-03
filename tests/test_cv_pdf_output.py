@@ -13,6 +13,7 @@ from jobfinder.evaluator.latex import (
     compile_latex_to_pdf,
     parse_page_count_from_output,
     prepare_latex_for_xelatex,
+    repair_reported_misplaced_ampersand,
 )
 from jobfinder.evaluator.models import JobEvaluation, JobRecord
 from jobfinder.evaluator.pdf_output import (
@@ -109,9 +110,9 @@ def test_assign_cv_ids_are_row_numbers_for_generated_cvs():
         JobRecord(4, "Remote Sensing / Example", "Job Title: Remote Sensing"),
     ]
     evaluations = {
-        2: JobEvaluation(2, "Suitable", 90, "Match", tailored_cv=LATEX_CV),
-        3: JobEvaluation(3, "Not Suitable", 30, "Too senior", tailored_cv=LATEX_CV),
-        4: JobEvaluation(4, "Suitable", 88, "Match", tailored_cv=LATEX_CV),
+        2: JobEvaluation(2, "Suitable", 18, "Match", tailored_cv=LATEX_CV),
+        3: JobEvaluation(3, "Not Suitable", 4, "Too senior", tailored_cv=LATEX_CV),
+        4: JobEvaluation(4, "Suitable", 17, "Match", tailored_cv=LATEX_CV),
     }
 
     candidates = assign_cv_ids(records, evaluations)
@@ -233,6 +234,53 @@ def test_compile_latex_to_pdf_runs_normalized_xelatex_source(tmp_path):
     assert output_pdf.exists()
 
 
+def test_repair_reported_misplaced_ampersand_only_changes_rejected_line():
+    source = "First & unchanged\nData & Visualization\nLast & unchanged\n"
+    compiler_log = "./cv.tex:2: Misplaced alignment tab character &."
+
+    repaired = repair_reported_misplaced_ampersand(source, compiler_log)
+
+    assert repaired == "First & unchanged\nData \\& Visualization\nLast & unchanged\n"
+
+
+def test_compile_latex_to_pdf_retries_reported_bare_ampersand(tmp_path):
+    calls: list[str] = []
+
+    def fake_runner(command, *, cwd, **kwargs):
+        source = (Path(cwd) / "cv.tex").read_text(encoding="utf-8")
+        calls.append(source)
+        if len(calls) == 1:
+            line_number = next(
+                index
+                for index, line in enumerate(source.splitlines(), start=1)
+                if "Data & Visualization" in line
+            )
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                f"./cv.tex:{line_number}: Misplaced alignment tab character &.",
+                "",
+            )
+        (Path(cwd) / "cv.pdf").write_bytes(b"%PDF-1.7\n")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            "Output written on cv.pdf (1 page, 10 bytes).",
+            "",
+        )
+
+    result = compile_latex_to_pdf(
+        "\\documentclass{article}\n\\begin{document}\nData & Visualization\n"
+        "\\end{document}",
+        tmp_path / "cv.pdf",
+        runner=fake_runner,
+    )
+
+    assert result.success is True
+    assert len(calls) == 2
+    assert "Data \\& Visualization" in calls[1]
+
+
 def test_drive_run_folder_name_uses_required_format():
     """Drive run folder names should use sortable timestamps."""
     assert drive_run_folder_name(datetime(2026, 5, 20, 9, 8, 7)) == (
@@ -245,7 +293,7 @@ def test_generate_cv_pdf_outputs_creates_drive_folder_and_links(tmp_path):
     service = FakeDriveService()
     uploads: list[tuple[Path, str, str]] = []
     records = [JobRecord(2, "GIS Analyst / Acme", "Job Title: GIS Analyst")]
-    evaluations = {2: JobEvaluation(2, "Suitable", 90, "Match", tailored_cv=LATEX_CV)}
+    evaluations = {2: JobEvaluation(2, "Suitable", 18, "Match", tailored_cv=LATEX_CV)}
 
     def fake_compile(
         latex_code: str,
@@ -253,7 +301,7 @@ def test_generate_cv_pdf_outputs_creates_drive_folder_and_links(tmp_path):
         **kwargs: Any,
     ) -> LatexCompilationResult:
         output_pdf.write_bytes(b"%PDF-1.7\n")
-        return LatexCompilationResult(success=True, pdf_path=output_pdf)
+        return LatexCompilationResult(success=True, pdf_path=output_pdf, page_count=1)
 
     def fake_upload(
         drive_service: Any,
@@ -289,20 +337,43 @@ def test_generate_cv_pdf_outputs_creates_drive_folder_and_links(tmp_path):
     assert uploads[0][2] == "2_CV_Applicant_GIS_Analyst_Acme.pdf"
 
 
-def test_generate_cv_pdf_outputs_requires_drive_folder_id():
-    """PDF output should clearly report a missing Drive folder ID."""
-    records = [JobRecord(2, "GIS Analyst / Acme", "Job Title: GIS Analyst")]
-    evaluations = {2: JobEvaluation(2, "Suitable", 90, "Match", tailored_cv=LATEX_CV)}
+def test_generate_cv_pdf_outputs_checkpoints_each_result(tmp_path):
+    service = FakeDriveService()
+    records = [JobRecord(2, "GIS Analyst / Acme", "job")]
+    evaluations = {2: JobEvaluation(2, "Suitable", 18, "Match", tailored_cv=LATEX_CV)}
+    checkpoints: list[tuple[int, str]] = []
 
     result = generate_cv_pdf_outputs(
         records,
         evaluations,
+        drive_service=service,
+        parent_folder_id="parent-folder-id",
+        now=datetime(2026, 7, 2, 18, 30, 0),
+        compile_latex=_make_compile_stub([2]),
+        upload_pdf=_fake_upload,
+        on_output=lambda row_number, value: checkpoints.append((row_number, value)),
+    )
+
+    assert checkpoints == [(2, result.outputs[2])]
+
+
+def test_generate_cv_pdf_outputs_requires_drive_folder_id():
+    """PDF output should clearly report a missing Drive folder ID."""
+    records = [JobRecord(2, "GIS Analyst / Acme", "Job Title: GIS Analyst")]
+    evaluations = {2: JobEvaluation(2, "Suitable", 18, "Match", tailored_cv=LATEX_CV)}
+
+    checkpoints: list[tuple[int, str]] = []
+    result = generate_cv_pdf_outputs(
+        records,
+        evaluations,
         drive_service=FakeDriveService(),
+        on_output=lambda row_number, value: checkpoints.append((row_number, value)),
     )
 
     assert result.success_count == 0
     assert result.error_count == 1
     assert "Missing Google Drive folder ID" in result.outputs[2]
+    assert checkpoints == [(2, result.outputs[2])]
 
 
 # ---------------------------------------------------------------------------
@@ -368,15 +439,19 @@ def _fake_upload(
 
 
 def test_generate_cv_pdf_outputs_accepts_cv_within_page_limit(tmp_path):
-    """A CV already within the page limit must be uploaded without shortening."""
+    """A CV within the limit must not remove projects or experiences."""
     service = FakeDriveService()
     records = [JobRecord(2, "GIS / Acme", "Job Title: GIS")]
-    evaluations = {2: JobEvaluation(2, "Suitable", 90, "ok", tailored_cv=LATEX_CV)}
+    evaluations = {2: JobEvaluation(2, "Suitable", 18, "ok", tailored_cv=LATEX_CV)}
 
-    shorten_calls: list[tuple[str, int]] = []
+    removal_calls: list[str] = []
 
-    def fake_shorten(latex: str, pages: int) -> str:
-        shorten_calls.append((latex, pages))
+    def fake_remove_project(latex: str) -> str:
+        removal_calls.append("project")
+        return latex
+
+    def fake_remove_experience(latex: str) -> str:
+        removal_calls.append("experience")
         return latex
 
     result = generate_cv_pdf_outputs(
@@ -388,28 +463,31 @@ def test_generate_cv_pdf_outputs_accepts_cv_within_page_limit(tmp_path):
         compile_latex=_make_compile_stub([2]),  # 2 pages, limit is 2
         upload_pdf=_fake_upload,
         max_page_limit=2,
-        shorten_latex=fake_shorten,
-        max_shorten_attempts=3,
+        remove_project=fake_remove_project,
+        remove_experience=fake_remove_experience,
     )
 
     assert result.success_count == 1
     assert result.error_count == 0
-    assert shorten_calls == []  # no shortening needed
+    assert removal_calls == []
 
 
-def test_generate_cv_pdf_outputs_shortens_overlong_cv_until_within_limit(tmp_path):
-    """A 3-page CV must be shortened until it reaches the 2-page limit."""
+def test_generate_cv_pdf_outputs_removes_project_first(tmp_path):
+    """A 3-page CV must remove one project and recompile before anything else."""
     service = FakeDriveService()
     records = [JobRecord(2, "GIS / Acme", "Job Title: GIS")]
-    evaluations = {2: JobEvaluation(2, "Suitable", 90, "ok", tailored_cv=LATEX_CV)}
+    evaluations = {2: JobEvaluation(2, "Suitable", 18, "ok", tailored_cv=LATEX_CV)}
 
-    shorten_calls: list[int] = []
+    removal_calls: list[str] = []
 
-    def fake_shorten(latex: str, pages: int) -> str:
-        shorten_calls.append(pages)
-        return latex + "% shorter\n"
+    def fake_remove_project(latex: str) -> str:
+        removal_calls.append("project")
+        return latex + "% project removed\n"
 
-    # First compile: 3 pages → shorten → second compile: 2 pages → upload.
+    def fake_remove_experience(latex: str) -> str:
+        removal_calls.append("experience")
+        return latex + "% experience removed\n"
+
     result = generate_cv_pdf_outputs(
         records,
         evaluations,
@@ -419,59 +497,54 @@ def test_generate_cv_pdf_outputs_shortens_overlong_cv_until_within_limit(tmp_pat
         compile_latex=_make_compile_stub([3, 2]),
         upload_pdf=_fake_upload,
         max_page_limit=2,
-        shorten_latex=fake_shorten,
-        max_shorten_attempts=3,
+        remove_project=fake_remove_project,
+        remove_experience=fake_remove_experience,
     )
 
     assert result.success_count == 1
     assert result.error_count == 0
-    assert shorten_calls == [3]  # shortened once
+    assert removal_calls == ["project"]
 
 
-def test_generate_cv_pdf_outputs_uploads_after_max_attempts_even_if_still_long():
-    """After exhausting shorten attempts, upload the best available version."""
+def test_generate_cv_pdf_outputs_keeps_cv_after_both_required_removals():
+    """A still-long CV is retained after exactly one removal of each type."""
     service = FakeDriveService()
     records = [JobRecord(2, "GIS / Acme", "Job Title: GIS")]
-    evaluations = {2: JobEvaluation(2, "Suitable", 90, "ok", tailored_cv=LATEX_CV)}
+    evaluations = {2: JobEvaluation(2, "Suitable", 18, "ok", tailored_cv=LATEX_CV)}
 
-    shorten_calls: list[int] = []
+    removal_calls: list[str] = []
 
-    def fake_shorten(latex: str, pages: int) -> str:
-        shorten_calls.append(pages)
-        return latex  # never actually gets shorter
+    def fake_remove_project(latex: str) -> str:
+        removal_calls.append("project")
+        return latex + "% project removed\n"
 
-    # All compilations return 3 pages — shortener is called max_shorten_attempts times.
+    def fake_remove_experience(latex: str) -> str:
+        removal_calls.append("experience")
+        return latex + "% experience removed\n"
+
     result = generate_cv_pdf_outputs(
         records,
         evaluations,
         drive_service=service,
         parent_folder_id="folder",
         now=datetime(2026, 1, 1),
-        compile_latex=_make_compile_stub([3, 3, 3, 3]),
+        compile_latex=_make_compile_stub([3, 3, 3]),
         upload_pdf=_fake_upload,
         max_page_limit=2,
-        shorten_latex=fake_shorten,
-        max_shorten_attempts=2,
+        remove_project=fake_remove_project,
+        remove_experience=fake_remove_experience,
     )
 
-    # Upload still succeeds (best-effort).
     assert result.success_count == 1
     assert result.error_count == 0
-    # Shortened exactly max_shorten_attempts times.
-    assert len(shorten_calls) == 2
+    assert removal_calls == ["project", "experience"]
 
 
-def test_generate_cv_pdf_outputs_skips_shortening_when_page_count_unknown():
-    """When the compiler does not report a page count, upload without shortening."""
+def test_generate_cv_pdf_outputs_rejects_unknown_page_count():
+    """An unknown page count must not bypass the page contract."""
     service = FakeDriveService()
     records = [JobRecord(2, "GIS / Acme", "Job Title: GIS")]
-    evaluations = {2: JobEvaluation(2, "Suitable", 90, "ok", tailored_cv=LATEX_CV)}
-
-    shorten_calls: list[int] = []
-
-    def fake_shorten(latex: str, pages: int) -> str:
-        shorten_calls.append(pages)
-        return latex
+    evaluations = {2: JobEvaluation(2, "Suitable", 18, "ok", tailored_cv=LATEX_CV)}
 
     result = generate_cv_pdf_outputs(
         records,
@@ -482,23 +555,21 @@ def test_generate_cv_pdf_outputs_skips_shortening_when_page_count_unknown():
         compile_latex=_make_compile_stub([None]),  # page_count unknown
         upload_pdf=_fake_upload,
         max_page_limit=2,
-        shorten_latex=fake_shorten,
-        max_shorten_attempts=3,
     )
 
-    assert result.success_count == 1
-    assert result.error_count == 0
-    assert shorten_calls == []
+    assert result.success_count == 0
+    assert result.error_count == 1
+    assert "page count could not be determined" in result.outputs[2]
 
 
-def test_generate_cv_pdf_outputs_uploads_when_shortener_raises():
-    """A shortener failure should not block the upload; use the current version."""
+def test_generate_cv_pdf_outputs_reports_safe_removal_failure():
+    """Failure to remove an exact block must stop rather than rewrite or over-trim."""
     service = FakeDriveService()
     records = [JobRecord(2, "GIS / Acme", "Job Title: GIS")]
-    evaluations = {2: JobEvaluation(2, "Suitable", 90, "ok", tailored_cv=LATEX_CV)}
+    evaluations = {2: JobEvaluation(2, "Suitable", 18, "ok", tailored_cv=LATEX_CV)}
 
-    def exploding_shorten(latex: str, pages: int) -> str:
-        raise RuntimeError("OpenAI quota exceeded")
+    def exploding_remove(latex: str) -> str:
+        raise RuntimeError("project block not found")
 
     result = generate_cv_pdf_outputs(
         records,
@@ -506,14 +577,12 @@ def test_generate_cv_pdf_outputs_uploads_when_shortener_raises():
         drive_service=service,
         parent_folder_id="folder",
         now=datetime(2026, 1, 1),
-        compile_latex=_make_compile_stub([3]),  # over limit but shortener fails
+        compile_latex=_make_compile_stub([3]),
         upload_pdf=_fake_upload,
         max_page_limit=2,
-        shorten_latex=exploding_shorten,
-        max_shorten_attempts=3,
+        remove_project=exploding_remove,
     )
 
-    # Gracefully uploaded the 3-page version rather than erroring.
-    assert result.success_count == 1
-    assert result.error_count == 0
-    assert result.outputs[2].startswith("https://drive.example/")
+    assert result.success_count == 0
+    assert result.error_count == 1
+    assert "Could not remove the least-relevant project" in result.outputs[2]

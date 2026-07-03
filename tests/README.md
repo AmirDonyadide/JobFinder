@@ -51,9 +51,12 @@ python -m pytest
 | `test_dedupe_matching.py` | Cross-provider matching, blockers, provenance, and historical dedupe identity. |
 | `test_google_sheets.py` | Shared Google OAuth token auth, refresh, API service construction, scopes, and missing credential messages. |
 | `test_cv_pdf_output.py` | PDF filename sanitization, CV ID assignment, LaTeX compile failures, Drive folder ID handling, and mocked Drive uploads. |
+| `test_cv_contract.py` | Locked Master-CV content, course pools, exact projects, experience identity, and overflow block removals. |
 | `test_indeed_provider.py` | Indeed actor payloads and normalization. |
+| `test_linkedin_provider.py` | LinkedIn public-search URL and live actor input schema. |
 | `test_stepstone_provider.py` | Stepstone actor payloads and normalization. |
 | `test_xing_provider.py` | Xing actor payloads and normalization. |
+| `test_scraper_smoke.py` | Schema-safe GIS/Germany payloads used by the four live smoke scripts. |
 | `test_evaluator_parsing.py` | Header updates, prompt row extraction, model-response parsing, and cleanup column selection. |
 | `test_evaluator_storage.py` | Excel/Google writes, incremental-save cleanup behavior, and unsuitable-row policy. |
 | `test_evaluator_openai_client.py` | Evaluator batching, callbacks, and large-queue pacing. |

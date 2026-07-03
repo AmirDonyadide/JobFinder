@@ -49,18 +49,18 @@ Checks:
 
 1. Checkout.
 2. Set up Python 3.14 with pip cache.
-3. Install LaTeX tools for PDF-generation coverage.
-4. Install `requirements-dev.txt`.
-5. Run Ruff lint.
-6. Run Ruff formatting check.
-7. Run mypy on `src`.
-8. Compile Python files.
-9. Smoke-test CLI help with `PYTHONPATH=src`.
-10. Validate `configs/filters.json`.
-11. Run `pytest`.
+3. Install `requirements-dev.txt`.
+4. Run Ruff lint.
+5. Run Ruff formatting check.
+6. Run mypy on `src`.
+7. Compile Python files.
+8. Smoke-test CLI help with `PYTHONPATH=src`.
+9. Validate `configs/filters.json`.
+10. Run `pytest`.
 
 This workflow does not require Apify, Google, or OpenAI secrets. Tests use fakes
-and monkeypatching for external services.
+and monkeypatching for external services. It does not install LaTeX because the
+current PDF tests mock the compiler instead of producing real PDFs.
 
 ## `jobs.yml`
 
@@ -69,8 +69,8 @@ Runs JobFinder in GitHub Actions.
 Triggers:
 
 - Manual `workflow_dispatch`.
-- Scheduled runs at `17 7 * * *`, `37 11 * * *`, and `17 15 * * *`,
-  with fallback runs guarded by `daily-run-gate`.
+- One scheduled run each day at 10:27 `Europe/Berlin`
+  (`27 10 * * *` with an explicit timezone).
 
 Manual inputs:
 
@@ -80,6 +80,8 @@ Manual inputs:
 | `posted_time_window` | `since_previous_run`, `last_24h`, `last_7d`, `backfill` |
 | `max_applicants` | `50`, `100`, `200`, `no_limit` |
 | `run_mode` | `scrape_and_evaluate`, `scrape_only` |
+| `output_mode` | `google_sheets`, `excel` |
+| `cv_pdf_output` | `true`, `false` |
 | `unsuitable_rows` | `single_label_only`, `keep_all` |
 
 ## Production Job Flow
@@ -87,34 +89,43 @@ Manual inputs:
 ```mermaid
 flowchart TD
     A["checkout"] --> B["setup Python 3.14"]
-    B --> C["install LaTeX tools"]
-    C --> D["install requirements.txt"]
-    D --> E["validate required secrets"]
-    E --> F["write private keyword/prompt/CV/photo files"]
-    F --> G["write Google OAuth token and spreadsheet ID"]
-    G --> H["preflight provider and sheet access"]
-    H --> I["run selected pipeline"]
-    I --> J["write workflow summary"]
-    J --> K["upload report artifacts"]
-    K --> L["remove private runtime files"]
+    B --> C["resolve workflow plan"]
+    C --> D["install scraper dependencies"]
+    D --> E{"evaluator?"}
+    E -- yes --> F["install evaluator dependencies"]
+    E -- no --> G["skip evaluator dependencies"]
+    F --> H{"Google needed?"}
+    G --> H
+    H -- yes --> I["install Google dependencies and write token"]
+    H -- no --> J["skip Google setup"]
+    I --> K{"PDF output?"}
+    J --> K
+    K -- yes --> L["install LaTeX tools"]
+    K -- no --> M["skip LaTeX"]
+    L --> N["run pipeline or direct scraper"]
+    M --> N
+    N --> O["upload report artifacts"]
+    O --> P["remove private runtime files"]
 ```
 
-The workflow sets `JOBFINDER_SCRAPER_OUTPUT_MODE=google_sheets` and writes private
-runtime files from secrets. Cleanup removes those files in an `always()` step.
+Scheduled runs keep `google_sheets`, `scrape_and_evaluate`, and PDF output
+enabled. Manual runs can choose lighter combinations. For example,
+`run_mode=scrape_only`, `output_mode=excel`, and `sources=linkedin` installs only
+scraper dependencies and runs the direct scraper CLI.
 
 ## Required Secrets
 
 | Secret | Required when | Description |
 |---|---|---|
 | `APIFY_API_TOKEN` | Always | One Apify token or up to 12 semicolon-separated tokens. |
-| `GOOGLE_SPREADSHEET_ID` | Always | Target spreadsheet ID. |
-| `GOOGLE_TOKEN_JSON` | Always | Full authorized-user token JSON from `google_token.json` for Sheets and Drive. |
-| `JOB_EVAL_CV_DRIVE_FOLDER_ID` | `scrape_and_evaluate` | Drive folder ID for generated CV PDF run folders. |
+| `GOOGLE_SPREADSHEET_ID` | Google Sheets output or `scrape_and_evaluate` | Target spreadsheet ID. |
+| `GOOGLE_TOKEN_JSON` | Google Sheets output or `scrape_and_evaluate` | Full authorized-user token JSON from `google_token.json` for Sheets and Drive. |
+| `JOB_EVAL_CV_DRIVE_FOLDER_ID` | `scrape_and_evaluate` with `cv_pdf_output=true` | Drive folder ID for generated CV PDF run folders. |
 | `JOB_KEYWORDS_TEXT` | Always | Contents of private `configs/keywords.txt`. |
 | `OPENAI_API_KEY` | `scrape_and_evaluate` | OpenAI API key. |
 | `MASTER_PROMPT_TEXT` | `scrape_and_evaluate` | Contents of private evaluator prompt. |
 | `MASTER_CV_TEX` | `scrape_and_evaluate` | Contents of private LaTeX CV. |
-| `CV_PHOTO_BASE64` | Optional | Base64-encoded private CV photo for LaTeX PDF generation. |
+| `CV_PHOTO_BASE64` | Optional when PDF output is enabled | Base64-encoded private CV photo for LaTeX PDF generation. |
 
 ## Report Artifacts
 
@@ -126,14 +137,16 @@ runtime files from secrets. Cleanup removes those files in an `always()` step.
 - `reports/workflow_summary.md`
 
 Reports are generated only when the corresponding env var path is configured.
+Excel-only manual scraper runs also upload `jobs.xlsx` as the
+`jobfinder-excel-output` artifact when the workbook is created.
 
 ## Operational Constraints
 
 - `concurrency.cancel-in-progress` is `false`, so scheduled/manual runs do not
   cancel an already running pipeline.
-- Scheduled runs have same-day fallback cron entries. `daily-run-gate` skips
-  fallback runs after one scheduled run has already succeeded for the current
-  `Europe/Berlin` day.
+- Scheduled runs execute once daily at 10:27 `Europe/Berlin` time.
+  `daily-run-gate` still prevents an additional scheduled execution after one
+  already succeeded for the current Berlin day.
 - The job timeout is 360 minutes.
 - Scheduled runs use default workflow inputs, not the last manual selections.
 - The workflow writes Google OAuth token JSON to a temporary runner file and

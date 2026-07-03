@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 from jobfinder.env import EnvSettings
+from jobfinder.evaluator.cv_contract import validate_master_cv_structure
 from jobfinder.evaluator.parsing import read_text_asset
 from jobfinder.evaluator.storage import read_google_spreadsheet_id
 from jobfinder.integrations.google.drive import (
@@ -40,8 +42,13 @@ def run_preflight(env: EnvSettings, *, should_evaluate: bool) -> PreflightResult
             env.get("JOB_EVAL_MASTER_PROMPT_FILE", str(DEFAULT_MASTER_PROMPT_FILE))
         )
         cv_file = Path(env.get("JOB_EVAL_CV_FILE", str(DEFAULT_CV_FILE)))
-        read_text_asset(master_prompt_file, "master prompt")
-        read_text_asset(cv_file, "LaTeX CV")
+        master_prompt = read_text_asset(master_prompt_file, "master prompt")
+        master_cv = read_text_asset(cv_file, "LaTeX CV")
+        if not re.search(r"\b20[\s-]*point", master_prompt, re.IGNORECASE):
+            raise RuntimeError(
+                "Master prompt is not the current 20-point evaluator version."
+            )
+        validate_master_cv_structure(master_cv)
         if not env.get("OPENAI_API_KEY"):
             raise RuntimeError("Missing OPENAI_API_KEY.")
         if env.get_bool("JOB_EVAL_CV_PDF_OUTPUT", True) and not env.get(
