@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from threading import Lock
 
+from jobfinder.evaluator.cv_contract import GERMAN_CV_CONTRACT, CvContract
 from jobfinder.evaluator.models import (
     EvaluationError,
     JobEvaluation,
@@ -138,6 +139,7 @@ class OpenAIJobEvaluator:
         base_delay: float,
         max_delay: float,
         max_output_tokens: int,
+        cv_contract: CvContract = GERMAN_CV_CONTRACT,
     ) -> None:
         """Create an evaluator with explicit retry and timeout settings."""
         try:
@@ -153,6 +155,7 @@ class OpenAIJobEvaluator:
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.max_output_tokens = max_output_tokens
+        self.cv_contract = cv_contract
         self.client = OpenAI(api_key=api_key, timeout=timeout, max_retries=0)
 
     def evaluate(
@@ -162,6 +165,7 @@ class OpenAIJobEvaluator:
         latex_cv: str,
     ) -> JobEvaluation:
         """Evaluate a single job record and parse the model response."""
+        cv_contract = getattr(self, "cv_contract", GERMAN_CV_CONTRACT)
         prompt = build_full_prompt(master_prompt, record.advertisement, latex_cv)
         response_text = self.call_openai(prompt, record)
         evaluation = parse_model_response(
@@ -183,6 +187,7 @@ class OpenAIJobEvaluator:
                 record.advertisement,
                 latex_cv,
                 response_text,
+                contract=cv_contract,
             )
             retry_response_text = self.call_openai(retry_prompt, record)
             evaluation.tailored_cv = extract_latex_cv_from_response(retry_response_text)
@@ -209,6 +214,7 @@ class OpenAIJobEvaluator:
                 evaluation.tailored_cv = enforce_protected_cv_sections(
                     evaluation.tailored_cv,
                     latex_cv,
+                    contract=cv_contract,
                 )
             except EvaluationError as exc:
                 LOGGER.warning(
@@ -224,6 +230,7 @@ class OpenAIJobEvaluator:
                     latex_cv,
                     response_text,
                     str(exc),
+                    contract=cv_contract,
                 )
                 retry_response_text = self.call_openai(retry_prompt, record)
                 repaired_cv = extract_latex_cv_from_response(retry_response_text)
@@ -231,6 +238,7 @@ class OpenAIJobEvaluator:
                     evaluation.tailored_cv = enforce_protected_cv_sections(
                         repaired_cv,
                         latex_cv,
+                        contract=cv_contract,
                     )
                 except EvaluationError as retry_exc:
                     return JobEvaluation(
@@ -252,12 +260,20 @@ class OpenAIJobEvaluator:
         """Call OpenAI with retries and return non-empty response text."""
         attempts = self.retries + 1
         last_error: Exception | None = None
+        cv_contract = getattr(self, "cv_contract", GERMAN_CV_CONTRACT)
+        language_instructions = (
+            "All tailored CV content, including section headings and descriptive "
+            f"text, must be written in professional {cv_contract.language}. "
+            "Keep truthful proper nouns in their official original form."
+        )
 
         for attempt in range(1, attempts + 1):
             try:
                 response = self.client.responses.create(
                     model=self.model,
-                    instructions=STRICT_OUTPUT_INSTRUCTIONS,
+                    instructions=(
+                        f"{STRICT_OUTPUT_INSTRUCTIONS}\n\n{language_instructions}"
+                    ),
                     input=prompt,
                     max_output_tokens=self.max_output_tokens,
                 )

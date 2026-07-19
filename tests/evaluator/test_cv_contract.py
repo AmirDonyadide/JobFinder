@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from jobfinder.evaluator.cv_contract import (
+    ENGLISH_CV_CONTRACT,
     enforce_master_cv_contract,
     experience_entries,
     project_entries,
@@ -90,6 +91,34 @@ Invented language
 \end{document}
 """
 
+ENGLISH_MASTER_CV = (
+    MASTER_CV.replace(
+        r"Zielposition \textbar{} Relevantes Stichwort 1",
+        r"Target Position \textbar{} Primary Research Field \textbar{} Core Methods",
+    )
+    .replace("JOBFINDER_", "FINDER_")
+    .replace(r"\section*{Profil}", r"\section*{Profile}")
+    .replace(r"\section*{Ausbildung}", r"\section*{Education}")
+    .replace(r"\section*{Berufserfahrung}", r"\section*{Experience}")
+    .replace(r"\section*{Projekte}", r"\section*{Research Projects}")
+    .replace(r"\section*{Sprachen}", r"\section*{Languages}")
+    .replace("Relevante Kurse", "Relevant Courses")
+    .replace("RELEVANTE KURSE", "RELEVANT COURSES")
+)
+
+ENGLISH_GENERATED_CV = (
+    GENERATED_CV.replace(
+        r"GIS-Analyst \textbar{} Python \textbar{} QGIS",
+        r"Doctoral Researcher \textbar{} Spatial Analysis \textbar{} Python",
+    )
+    .replace(r"\section*{Profil}", r"\section*{Profile}")
+    .replace(r"\section*{Ausbildung}", r"\section*{Education}")
+    .replace(r"\section*{Berufserfahrung}", r"\section*{Experience}")
+    .replace(r"\section*{Projekte}", r"\section*{Research Projects}")
+    .replace(r"\section*{Sprachen}", r"\section*{Languages}")
+    .replace("Relevante Kurse", "Relevant Courses")
+)
+
 
 def test_master_contract_restores_locked_content_and_exact_projects():
     protected = enforce_master_cv_contract(GENERATED_CV, MASTER_CV)
@@ -139,3 +168,40 @@ def test_overflow_removes_only_last_ranked_blocks():
 
 def test_master_structure_validator_accepts_contract_template():
     validate_master_cv_structure(MASTER_CV)
+
+
+def test_english_contract_enforces_and_trims_phdfinder_cv():
+    validate_master_cv_structure(
+        ENGLISH_MASTER_CV,
+        contract=ENGLISH_CV_CONTRACT,
+    )
+
+    protected = enforce_master_cv_contract(
+        ENGLISH_GENERATED_CV,
+        ENGLISH_MASTER_CV,
+        contract=ENGLISH_CV_CONTRACT,
+    )
+
+    assert r"\section*{Education}" in protected
+    assert r"\textit{Relevant Courses:} Machine Learning" in protected
+    assert "Locked languages" in protected
+    assert "Invented language" not in protected
+    assert [
+        entry.title
+        for entry in project_entries(protected, contract=ENGLISH_CV_CONTRACT)[1]
+    ] == ["Project Three", "Project One", "Project Two"]
+
+    without_project = remove_least_relevant_project(
+        protected,
+        contract=ENGLISH_CV_CONTRACT,
+    )
+    without_experience = remove_least_relevant_experience(
+        without_project,
+        contract=ENGLISH_CV_CONTRACT,
+    )
+    assert len(
+        project_entries(without_project, contract=ENGLISH_CV_CONTRACT)[1]
+    ) == 2
+    assert len(
+        experience_entries(without_experience, contract=ENGLISH_CV_CONTRACT)[1]
+    ) == 1

@@ -3,6 +3,8 @@
 PhDFinder is an academic-role product built on the shared finder engine. It searches
 for PhD, doctoral researcher, research assistant, and related roles while
 keeping its inputs and output state independent from the normal job search.
+The evaluator produces a completely English academic CV, with the exception of
+official names or titles that must remain unchanged for factual accuracy.
 
 ## What is shared and what is separate
 
@@ -28,6 +30,10 @@ cp products/phdfinder/config/keywords.example.txt products/phdfinder/config/keyw
 cp products/phdfinder/evaluator/master_prompt.example.txt products/phdfinder/evaluator/master_prompt.txt
 cp products/phdfinder/evaluator/master_cv.example.tex products/phdfinder/evaluator/master_cv.tex
 ```
+
+The private prompt and CV must retain the English section vocabulary from these
+templates. Older German-oriented private copies should be recreated before the
+next evaluation run.
 
 Review `products/phdfinder/config/filters.json`, then run preflight:
 

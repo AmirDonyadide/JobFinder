@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from jobfinder.env import EnvSettings
+from jobfinder.evaluator.cv_contract import cv_contract_for_product
 from jobfinder.evaluator.models import (
     DEFAULT_MODEL,
     OUTPUT_COLUMNS,
@@ -433,6 +434,7 @@ def generate_and_save_cv_pdf_outputs(
             applicant_name=options.cv_pdf_applicant_name,
             timeout_seconds=options.cv_pdf_compile_timeout,
             max_page_limit=options.cv_max_pages,
+            cv_contract=cv_contract_for_product(options.profile),
             on_output=checkpoint_pdf_output,
         )
     finally:
@@ -583,6 +585,7 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
         base_delay=options.retry_base_delay,
         max_delay=options.retry_max_delay,
         max_output_tokens=options.max_output_tokens,
+        cv_contract=cv_contract_for_product(options.profile),
     )
 
     pending_evaluations: dict[int, JobEvaluation] = {}

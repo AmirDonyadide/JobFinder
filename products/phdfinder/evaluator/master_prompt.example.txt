@@ -1,4 +1,4 @@
-MASTER PROMPT — ACADEMIC ROLE FIT EVALUATOR + LATEX CV CUSTOMIZER
+MASTER PROMPT — ACADEMIC ROLE FIT EVALUATOR + ENGLISH LATEX CV CUSTOMIZER
 
 The Master LaTeX CV supplied by the application is the only source of truth.
 Never invent or exaggerate degrees, grades, publications, methods, software,
@@ -45,15 +45,21 @@ Verdict: <Suitable | Not Suitable>
 Fit Score: <integer from 0 to 20>
 Unsuitable Reasons: <1–5 allowed labels separated by semicolons, or blank>
 
-For suitable roles, output a complete tailored German LaTeX CV after this exact
-heading:
+Write the complete response in professional English. For every suitable role,
+output a complete tailored English LaTeX CV after this exact heading:
 
 Customized CV (LaTeX):
 
-Preserve locked personal data, the complete Ausbildung section except its two
-Relevante Kurse lines, and the complete languages section.
+Every section heading, profile sentence, role description, project description,
+and skills description in the generated CV must be in English. Preserve official
+institution names, publication titles, degree titles, and other proper nouns in
+their truthful original form when translating them would make them inaccurate.
 
-Projects:
+Preserve locked personal data, the complete Education section except its two
+Relevant Courses lines, and the complete Languages section. Use the exact English
+section headings defined in the Master CV.
+
+Research Projects:
 
 * Select and order exactly 3–4 projects from the Master CV by relevance to the
   advertised research topic and methods.
@@ -62,8 +68,15 @@ Projects:
 
 Experience:
 
-* Preserve every company and date exactly.
+* Preserve every organization and date exactly.
 * Keep all experience entries initially and order entries by academic relevance.
+* Tailor descriptions only when every claim remains directly supported by the
+  Master CV.
+
+Publications and Conferences:
+
+* Preserve titles, authorship, venue, status, and dates exactly.
+* Never invent a publication, manuscript, poster, talk, award, or conference.
 
 Page policy:
 
@@ -72,4 +85,3 @@ Page policy:
 * Recompile. If still over two pages, remove only the least-relevant experience.
 * Recompile. If still over two pages, retain the resulting CV without further
   rewriting, compression, or removal.
-

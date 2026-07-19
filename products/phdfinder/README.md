@@ -4,6 +4,11 @@ PhDFinder searches PhD, doctoral-researcher, research-assistant, and related
 academic roles. It uses the shared finder engine while keeping all academic
 configuration and runtime state separate from JobFinder.
 
+Its evaluator and tailored LaTeX CV are English-only. The tracked prompt and CV
+examples use English instructions, section headings, course labels, profiles,
+and research descriptions; official proper nouns may remain in their original
+form when accuracy requires it.
+
 ## Product-owned files
 
 ```text
@@ -28,6 +33,9 @@ cp products/phdfinder/config/keywords.example.txt products/phdfinder/config/keyw
 cp products/phdfinder/evaluator/master_prompt.example.txt products/phdfinder/evaluator/master_prompt.txt
 cp products/phdfinder/evaluator/master_cv.example.tex products/phdfinder/evaluator/master_cv.tex
 ```
+
+If you created the private prompt or CV from an older German-oriented example,
+recreate it from these English templates and then add your truthful information.
 
 Then run a safe check:
 
