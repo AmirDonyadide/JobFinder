@@ -11,7 +11,7 @@ from jobfinder.integrations.google.sheets import (
 )
 from jobfinder.scraper.export_rows import HEADER, make_job_rows, unique_name
 from jobfinder.scraper.run_history import append_seen_job_keys, job_identity_keys
-from jobfinder.scraper.settings import DEFAULT_SPREADSHEET_TITLE, ScraperSettings
+from jobfinder.scraper.settings import ScraperSettings
 
 
 class GoogleSheetsExportError(RuntimeError):
@@ -206,7 +206,7 @@ def create_google_spreadsheet(
     spreadsheet = google_execute(
         service.spreadsheets().create(
             body={
-                "properties": {"title": DEFAULT_SPREADSHEET_TITLE},
+                "properties": {"title": settings.profile.spreadsheet_title},
                 "sheets": [{"properties": {"title": settings.run_sheet_name}}],
             },
             fields="spreadsheetId,spreadsheetUrl,sheets(properties(sheetId,title))",

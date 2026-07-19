@@ -100,6 +100,39 @@ def test_load_scraper_settings_reads_canonical_scraper_env_aliases(monkeypatch):
     assert settings.posted_time_window == "last_7d"
 
 
+def test_load_scraper_settings_uses_phdfinder_profile_files(monkeypatch):
+    """Academic runs should not read or write JobFinder's private profile files."""
+    loaded_paths = {}
+
+    def fake_load_filter_config(path):
+        loaded_paths["filters"] = path
+        return {}
+
+    def fake_load_keywords(path):
+        loaded_paths["keywords"] = path
+        return ["Doctoral researcher"]
+
+    monkeypatch.setattr(
+        "jobfinder.scraper.settings.load_filter_config",
+        fake_load_filter_config,
+    )
+    monkeypatch.setattr(
+        "jobfinder.scraper.settings.load_keywords",
+        fake_load_keywords,
+    )
+
+    settings = load_scraper_settings(
+        EnvSettings({"APIFY_API_TOKEN": "apify_api_real_token"}),
+        profile="phd",
+    )
+
+    assert settings.profile.key == "phd"
+    assert loaded_paths["filters"] == settings.profile.filters_file
+    assert loaded_paths["keywords"] == settings.profile.keywords_file
+    assert settings.excel_output_file.name == "phd_jobs.xlsx"
+    assert settings.spreadsheet_id_file.parent.name == "phd"
+
+
 def test_load_scraper_settings_reads_semicolon_separated_apify_tokens(monkeypatch):
     """Settings should keep all tokens and expose the first for compatibility."""
     monkeypatch.setattr("jobfinder.scraper.settings.load_filter_config", lambda _: {})

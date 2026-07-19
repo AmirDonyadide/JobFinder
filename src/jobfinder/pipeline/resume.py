@@ -16,7 +16,7 @@ from jobfinder.evaluator.parsing import (
 from jobfinder.evaluator.storage import build_evaluator_google_sheets_service
 from jobfinder.integrations.google.client import google_execute
 from jobfinder.integrations.google.sheets import quote_sheet_name
-from jobfinder.paths import GOOGLE_SPREADSHEET_ID_FILE
+from jobfinder.profiles import FinderProfile, profile_spreadsheet_id
 from jobfinder.scraper.run_history import parse_run_sheet_started_at
 from jobfinder.scraper.settings import load_timezone
 
@@ -42,16 +42,17 @@ def pipeline_timezone(env: EnvSettings) -> ZoneInfo:
     return load_timezone(value, "JOBFINDER_PIPELINE_TIMEZONE")
 
 
-def read_pipeline_google_spreadsheet_id(env: EnvSettings) -> str:
+def read_pipeline_google_spreadsheet_id(
+    env: EnvSettings,
+    *,
+    profile: str | FinderProfile | None = None,
+) -> str:
     """Resolve the Google spreadsheet ID available to the pipeline."""
-    spreadsheet_id = env.get("JOB_EVAL_GOOGLE_SPREADSHEET_ID") or env.get(
-        "GOOGLE_SPREADSHEET_ID"
+    return profile_spreadsheet_id(
+        env,
+        profile,
+        explicit=env.get("JOB_EVAL_GOOGLE_SPREADSHEET_ID"),
     )
-    if spreadsheet_id:
-        return spreadsheet_id
-    if GOOGLE_SPREADSHEET_ID_FILE.exists():
-        return GOOGLE_SPREADSHEET_ID_FILE.read_text(encoding="utf-8").strip()
-    return ""
 
 
 def visible_sheet_names(service: Any, spreadsheet_id: str) -> list[str]:
@@ -137,9 +138,10 @@ def find_incomplete_evaluation_sheet(
     *,
     service: Any | None = None,
     now: datetime | None = None,
+    profile: str | FinderProfile | None = None,
 ) -> IncompleteEvaluationSheet | None:
     """Find the newest same-day run tab that still needs evaluation."""
-    spreadsheet_id = read_pipeline_google_spreadsheet_id(env)
+    spreadsheet_id = read_pipeline_google_spreadsheet_id(env, profile=profile)
     if not spreadsheet_id:
         return None
 

@@ -40,11 +40,10 @@ from jobfinder.evaluator.storage import (
     write_excel_output,
     write_google_output,
 )
-from jobfinder.paths import (
-    DEFAULT_CV_FILE,
-    DEFAULT_CV_PHOTO_FILE,
-    DEFAULT_EXCEL_FILE,
-    DEFAULT_MASTER_PROMPT_FILE,
+from jobfinder.profiles import (
+    FinderProfile,
+    profile_cv_drive_folder_id,
+    profile_from_env,
 )
 
 LOGGER = logging.getLogger("job_fit_evaluator")
@@ -86,6 +85,7 @@ class EvaluationOptions:
     """Resolved evaluator settings for one workflow run."""
 
     env: EnvSettings
+    profile: FinderProfile
     source_arg: str | None
     sheet: str
     google_sheet_id_arg: str
@@ -137,30 +137,38 @@ def options_from_env(
     sheet: str,
     google_sheet_id_arg: str,
     pdf_only: bool = False,
+    profile: str | FinderProfile | None = None,
 ) -> EvaluationOptions:
     """Build evaluator options from CLI args plus environment settings."""
+    finder_profile = profile_from_env(env, profile)
     cv_pdf_output = env.get_bool("JOB_EVAL_CV_PDF_OUTPUT", True)
-    cv_drive_folder_id = env.get(
-        "JOB_EVAL_CV_DRIVE_FOLDER_ID",
-        DEFAULT_DRIVE_PARENT_FOLDER_ID,
-    )
+    cv_drive_folder_id = profile_cv_drive_folder_id(env, finder_profile)
+    if not cv_drive_folder_id:
+        cv_drive_folder_id = DEFAULT_DRIVE_PARENT_FOLDER_ID
     if cv_pdf_output and not cv_drive_folder_id.strip():
         raise EvaluationError(
-            "Missing JOB_EVAL_CV_DRIVE_FOLDER_ID. Set it to the ID of the Google "
-            "Drive folder where generated CV PDFs should be uploaded, or set "
+            f"Missing {finder_profile.cv_drive_folder_id_env}. Set it to the ID of "
+            "the Google Drive folder where generated CV PDFs should be uploaded, "
+            "or set "
             "JOB_EVAL_CV_PDF_OUTPUT=false."
         )
 
     return EvaluationOptions(
         env=env,
+        profile=finder_profile,
         source_arg=source_arg,
         sheet=sheet,
         google_sheet_id_arg=google_sheet_id_arg,
-        excel_file=Path(env.get("JOB_EVAL_EXCEL_FILE", str(DEFAULT_EXCEL_FILE))),
-        master_prompt_file=Path(
-            env.get("JOB_EVAL_MASTER_PROMPT_FILE", str(DEFAULT_MASTER_PROMPT_FILE))
+        excel_file=Path(
+            env.get("JOB_EVAL_EXCEL_FILE", str(finder_profile.excel_output_file))
         ),
-        cv_file=Path(env.get("JOB_EVAL_CV_FILE", str(DEFAULT_CV_FILE))),
+        master_prompt_file=Path(
+            env.get(
+                "JOB_EVAL_MASTER_PROMPT_FILE",
+                str(finder_profile.master_prompt_file),
+            )
+        ),
+        cv_file=Path(env.get("JOB_EVAL_CV_FILE", str(finder_profile.cv_file))),
         model=env.get("JOB_EVAL_OPENAI_MODEL", DEFAULT_MODEL),
         batch_size=env.get_int("JOB_EVAL_BATCH_SIZE", 40),
         concurrency=env.get_int("JOB_EVAL_CONCURRENCY", 8),
@@ -171,7 +179,7 @@ def options_from_env(
         max_output_tokens=env.get_int("JOB_EVAL_MAX_OUTPUT_TOKENS", 9000),
         cv_pdf_output=cv_pdf_output,
         cv_photo_file=Path(
-            env.get("JOB_EVAL_CV_PHOTO_FILE", str(DEFAULT_CV_PHOTO_FILE))
+            env.get("JOB_EVAL_CV_PHOTO_FILE", str(finder_profile.cv_photo_file))
         ),
         cv_pdf_compile_timeout=env.get_int("JOB_EVAL_CV_PDF_TIMEOUT", 120),
         cv_drive_folder_id=cv_drive_folder_id,
@@ -443,7 +451,11 @@ def run_evaluation(options: EvaluationOptions) -> EvaluationSummary:
     """Run the evaluator workflow using resolved options."""
     validate_runtime_settings(options)
 
-    spreadsheet_id = read_google_spreadsheet_id(options.google_sheet_id_arg)
+    spreadsheet_id = read_google_spreadsheet_id(
+        options.google_sheet_id_arg,
+        env=options.env,
+        profile=options.profile,
+    )
     source = parse_source(options.source_arg, spreadsheet_id, options.env)
 
     LOGGER.info("Loading %s input ...", source)

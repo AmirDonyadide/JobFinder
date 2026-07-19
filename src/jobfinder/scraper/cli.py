@@ -36,11 +36,17 @@ __all__ = [
 
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build the scraper CLI argument parser."""
-    return argparse.ArgumentParser(
+    parser = argparse.ArgumentParser(
         description=(
             "Scrape jobs through Apify and export them to Excel or Google Sheets."
         )
     )
+    parser.add_argument(
+        "--profile",
+        choices=("jobs", "phd"),
+        help="Use the standard JobFinder profile or the academic PhDFinder profile.",
+    )
+    return parser
 
 
 def configure_logging() -> None:
@@ -51,9 +57,9 @@ def configure_logging() -> None:
 def main() -> int:
     """Run the scraper CLI using resolved local settings."""
     configure_logging()
-    build_arg_parser().parse_args()
+    args = build_arg_parser().parse_args()
     try:
-        settings = load_scraper_settings()
+        settings = load_scraper_settings(profile=args.profile)
     except RuntimeError as exc:
         LOGGER.error("%s", exc)
         write_report_from_env(

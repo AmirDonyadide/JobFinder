@@ -17,6 +17,11 @@ JobFinder is a Python data pipeline with three product workflows:
 - Evaluate exported rows with OpenAI, generate tailored CV PDFs, and write
   results back to the same storage surface.
 
+The engine supports product profiles. `jobs` preserves the original JobFinder
+paths and behavior; `phd` supplies PhDFinder-specific assets and isolated state
+without duplicating provider or pipeline code. Profile definitions live in
+`src/jobfinder/profiles.py`.
+
 The main package is already organized under `src/jobfinder`, with thin root and
 `scripts/` compatibility wrappers. The test suite covers provider adapters,
 search execution, dedupe, evaluator parsing/storage, Google auth helpers, and

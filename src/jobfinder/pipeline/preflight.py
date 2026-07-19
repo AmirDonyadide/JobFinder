@@ -14,7 +14,11 @@ from jobfinder.integrations.google.drive import (
     build_google_drive_service,
     get_drive_folder,
 )
-from jobfinder.paths import DEFAULT_CV_FILE, DEFAULT_MASTER_PROMPT_FILE
+from jobfinder.profiles import (
+    FinderProfile,
+    profile_cv_drive_folder_id,
+    profile_from_env,
+)
 from jobfinder.scraper.export_google_sheets import build_scraper_google_sheets_service
 from jobfinder.scraper.run_history import load_google_spreadsheet_context
 from jobfinder.scraper.settings import ScraperSettings, load_scraper_settings
@@ -24,6 +28,7 @@ from jobfinder.scraper.settings import ScraperSettings, load_scraper_settings
 class PreflightResult:
     """Summary of pipeline readiness checks."""
 
+    profile: str
     source_mode: str
     output_mode: str
     keyword_count: int
@@ -31,17 +36,26 @@ class PreflightResult:
     evaluation_inputs_ready: bool
 
 
-def run_preflight(env: EnvSettings, *, should_evaluate: bool) -> PreflightResult:
+def run_preflight(
+    env: EnvSettings,
+    *,
+    should_evaluate: bool,
+    profile: str | FinderProfile | None = None,
+) -> PreflightResult:
     """Validate local config, dependencies, and Google Sheets access."""
-    settings = load_scraper_settings(env)
+    finder_profile = profile_from_env(env, profile)
+    settings = load_scraper_settings(env, profile=finder_profile)
     google_sheets_ready = validate_google_sheets(settings)
 
     evaluation_inputs_ready = False
     if should_evaluate:
         master_prompt_file = Path(
-            env.get("JOB_EVAL_MASTER_PROMPT_FILE", str(DEFAULT_MASTER_PROMPT_FILE))
+            env.get(
+                "JOB_EVAL_MASTER_PROMPT_FILE",
+                str(finder_profile.master_prompt_file),
+            )
         )
-        cv_file = Path(env.get("JOB_EVAL_CV_FILE", str(DEFAULT_CV_FILE)))
+        cv_file = Path(env.get("JOB_EVAL_CV_FILE", str(finder_profile.cv_file)))
         master_prompt = read_text_asset(master_prompt_file, "master prompt")
         master_cv = read_text_asset(cv_file, "LaTeX CV")
         if not re.search(r"\b20[\s-]*point", master_prompt, re.IGNORECASE):
@@ -51,20 +65,26 @@ def run_preflight(env: EnvSettings, *, should_evaluate: bool) -> PreflightResult
         validate_master_cv_structure(master_cv)
         if not env.get("OPENAI_API_KEY"):
             raise RuntimeError("Missing OPENAI_API_KEY.")
-        if env.get_bool("JOB_EVAL_CV_PDF_OUTPUT", True) and not env.get(
-            "JOB_EVAL_CV_DRIVE_FOLDER_ID"
+        if env.get_bool("JOB_EVAL_CV_PDF_OUTPUT", True) and not (
+            profile_cv_drive_folder_id(env, finder_profile)
         ):
             raise RuntimeError(
-                "Missing JOB_EVAL_CV_DRIVE_FOLDER_ID. Set it to the ID of the "
-                "Google Drive folder where generated CV PDFs should be uploaded, "
+                f"Missing {finder_profile.cv_drive_folder_id_env}. Set it to the ID "
+                "of the Google Drive folder where generated CV PDFs should be "
+                "uploaded, "
                 "or set JOB_EVAL_CV_PDF_OUTPUT=false."
             )
         if env.get_bool("JOB_EVAL_CV_PDF_OUTPUT", True):
-            validate_google_drive_folder(env)
-        read_google_spreadsheet_id(env.get("JOB_EVAL_GOOGLE_SPREADSHEET_ID"))
+            validate_google_drive_folder(env, profile=finder_profile)
+        read_google_spreadsheet_id(
+            env.get("JOB_EVAL_GOOGLE_SPREADSHEET_ID"),
+            env=env,
+            profile=finder_profile,
+        )
         evaluation_inputs_ready = True
 
     return PreflightResult(
+        profile=finder_profile.key,
         source_mode=settings.source_mode,
         output_mode=settings.output_mode,
         keyword_count=len(settings.keywords),
@@ -80,9 +100,13 @@ def validate_google_sheets(settings: ScraperSettings) -> bool:
     return True
 
 
-def validate_google_drive_folder(env: EnvSettings) -> bool:
+def validate_google_drive_folder(
+    env: EnvSettings,
+    *,
+    profile: str | FinderProfile | None = None,
+) -> bool:
     """Validate Google Drive credentials and configured PDF folder access."""
-    folder_id = env.get("JOB_EVAL_CV_DRIVE_FOLDER_ID")
+    folder_id = profile_cv_drive_folder_id(env, profile)
     service = build_google_drive_service(error_cls=RuntimeError)
     get_drive_folder(service, folder_id)
     return True

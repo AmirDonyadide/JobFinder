@@ -25,7 +25,7 @@ from jobfinder.integrations.google.sheets import (
     build_google_sheets_service,
     quote_sheet_name,
 )
-from jobfinder.paths import GOOGLE_SPREADSHEET_ID_FILE
+from jobfinder.profiles import FinderProfile, profile_spreadsheet_id
 
 LABEL_SEPARATOR_RE = re.compile(r"[;\n]+")
 LIST_MARKER_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s*")
@@ -228,17 +228,15 @@ def build_evaluator_google_sheets_service() -> Any:
     return build_google_sheets_service(error_cls=GoogleSheetsError)
 
 
-def read_google_spreadsheet_id(cli_value: str) -> str:
+def read_google_spreadsheet_id(
+    cli_value: str,
+    *,
+    env: EnvSettings | None = None,
+    profile: str | FinderProfile | None = None,
+) -> str:
     """Resolve a spreadsheet ID from CLI, env, or local cache file."""
-    if cli_value:
-        return cli_value
-
-    env_value = EnvSettings().get("GOOGLE_SPREADSHEET_ID")
-    if env_value:
-        return env_value
-    if GOOGLE_SPREADSHEET_ID_FILE.exists():
-        return GOOGLE_SPREADSHEET_ID_FILE.read_text(encoding="utf-8").strip()
-    return ""
+    settings = env or EnvSettings()
+    return profile_spreadsheet_id(settings, profile, explicit=cli_value)
 
 
 def read_google_input(

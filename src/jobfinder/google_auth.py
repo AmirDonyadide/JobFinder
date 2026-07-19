@@ -58,7 +58,8 @@ def check_google_connection() -> None:
     """Run a local Google Sheets and Drive OAuth smoke test."""
     settings = EnvSettings()
     spreadsheet_id = read_google_spreadsheet_id(
-        settings.get("JOB_EVAL_GOOGLE_SPREADSHEET_ID")
+        settings.get("JOB_EVAL_GOOGLE_SPREADSHEET_ID"),
+        env=settings,
     )
     drive_folder_id = settings.get("JOB_EVAL_CV_DRIVE_FOLDER_ID")
 
