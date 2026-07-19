@@ -1,22 +1,18 @@
 # Tests
 
-The test suite verifies JobFinder behavior without making real Apify, Google, or
-OpenAI network calls.
-
-Use these tests when you change a fork's providers, config loading, spreadsheet
-columns, evaluation behavior, or workflow defaults and want confidence before
-running paid external services.
+Tests mirror the package structure so each product or shared subsystem is easy
+to find. The suite never calls Apify, Google, or OpenAI over the network.
 
 ## Prerequisites
 
 - Python 3.14 or newer.
-- Development dependencies from `requirements-dev.txt`.
+- The `all` and `dev` dependency groups from `pyproject.toml`.
 - No real API keys are required.
 
 ## Quick Start
 
 ```bash
-python -m pip install -r requirements-dev.txt
+python -m pip install -e ".[all,dev]"
 python -m pytest
 ```
 
@@ -32,36 +28,24 @@ Run CI-equivalent checks from the repository root:
 python -m ruff check .
 python -m ruff format --check .
 python -m mypy src
-python -m compileall src tests scripts run_job_pipeline.py linkedin_job_scraper.py job_fit_evaluator.py job_scraper_config.py
-python -m json.tool configs/filters.json
+python -m compileall src tests scripts
+python -m json.tool products/jobfinder/config/filters.json
+python -m json.tool products/phdfinder/config/filters.json
 python -m pytest
 ```
 
-## Test Map
+## Layout
 
-| Test file | Coverage |
+| Directory | Coverage |
 |---|---|
-| `test_config_files.py` | Keyword and filter config loading. |
-| `test_scraper_settings.py` | Scraper settings resolution, token parsing, provider defaults, and value clamping. |
-| `test_scraper_search.py` | Apify async execution, retries, token fallback, source parsing, batching, concurrency, and Stepstone failure isolation. |
-| `test_scraper_filters.py` | Company and applicant-count filters. |
-| `test_scraper_normalize.py` | Applicant parsing, HTML description cleanup, and scraper dedupe facade. |
-| `test_scraper_export_rows.py` | Spreadsheet header and row generation. |
-| `test_scraper_run_history.py` | Previous-run windows, exact posted filtering, historical duplicate keys, and seen-jobs index behavior. |
-| `test_dedupe_matching.py` | Cross-provider matching, blockers, provenance, and historical dedupe identity. |
-| `test_google_sheets.py` | Shared Google OAuth token auth, refresh, API service construction, scopes, and missing credential messages. |
-| `test_cv_pdf_output.py` | PDF filename sanitization, CV ID assignment, LaTeX compile failures, Drive folder ID handling, and mocked Drive uploads. |
-| `test_cv_contract.py` | Locked Master-CV content, course pools, exact projects, experience identity, and overflow block removals. |
-| `test_indeed_provider.py` | Indeed actor payloads and normalization. |
-| `test_linkedin_provider.py` | LinkedIn public-search URL and live actor input schema. |
-| `test_stepstone_provider.py` | Stepstone actor payloads and normalization. |
-| `test_xing_provider.py` | Xing actor payloads and normalization. |
-| `test_scraper_smoke.py` | Schema-safe GIS/Germany payloads used by the four live smoke scripts. |
-| `test_evaluator_parsing.py` | Header updates, prompt row extraction, model-response parsing, and cleanup column selection. |
-| `test_evaluator_storage.py` | Excel/Google writes, incremental-save cleanup behavior, and unsuitable-row policy. |
-| `test_evaluator_openai_client.py` | Evaluator batching, callbacks, and large-queue pacing. |
-| `test_evaluator_cli.py` | Evaluator source aliases and row-policy parsing. |
-| `test_pipeline_cli.py` | Pipeline mode aliases and required secret validation. |
+| `products/` | Product aliases, isolated paths, and the legacy profile facade. |
+| `providers/` | Indeed, LinkedIn, Stepstone, and Xing adapters. |
+| `scraper/` | Configuration, settings, search, filters, normalization, export, history, and smoke payloads. |
+| `dedupe/` | Cross-provider identity, blockers, provenance, and merge behavior. |
+| `evaluator/` | CLI parsing, OpenAI orchestration, storage, CV contracts, and PDF output. |
+| `pipeline/` | Pipeline CLI modes, preflight requirements, and resume behavior. |
+| `integrations/` | Shared Google authentication and service construction. |
+| `operations/` | CI secret validation, runtime-file preparation, and manifest-scoped cleanup. |
 
 ## External Service Strategy
 
@@ -82,22 +66,22 @@ user-facing behavior change.
 
 | Fork change | Update or run |
 |---|---|
-| New provider or actor payload | Provider-specific test plus `test_scraper_search.py`. |
-| New spreadsheet column | `test_scraper_export_rows.py`, `test_evaluator_parsing.py`, and `test_evaluator_storage.py`. |
-| New config key or default | `test_config_files.py`, `test_scraper_settings.py`, and related docs. |
-| New workflow secret or mode | `test_pipeline_cli.py` and `.github/workflows/README.md`. |
-| New evaluator output format | `test_evaluator_parsing.py` and `test_evaluator_openai_client.py`. |
+| New provider or actor payload | Provider-specific test plus `scraper/test_search.py`. |
+| New spreadsheet column | `scraper/test_export_rows.py`, `evaluator/test_parsing.py`, and `evaluator/test_storage.py`. |
+| New config key or default | `scraper/test_config_files.py`, `scraper/test_settings.py`, and related docs. |
+| New workflow secret or mode | `pipeline/test_cli.py`, `operations/test_runtime_files.py`, and `.github/workflows/README.md`. |
+| New evaluator output format | `evaluator/test_parsing.py` and `evaluator/test_openai_client.py`. |
 
 ## Focused Test Guidance
 
 | Change area | Suggested tests |
 |---|---|
-| Provider payload/normalization | Provider-specific test plus `test_scraper_search.py`. |
-| Dedupe identity | `test_dedupe_matching.py`, `test_scraper_run_history.py`. |
-| Spreadsheet schema | `test_scraper_export_rows.py`, `test_evaluator_parsing.py`, `test_evaluator_storage.py`. |
-| Evaluator prompt or parsing | `test_evaluator_parsing.py`, `test_evaluator_openai_client.py`. |
-| CV PDF output | `test_cv_pdf_output.py`, `test_evaluator_storage.py`. |
-| Pipeline/GitHub settings | `test_pipeline_cli.py`, `test_scraper_settings.py`. |
+| Provider payload/normalization | `providers/` plus `scraper/test_search.py`. |
+| Dedupe identity | `dedupe/test_matching.py`, `scraper/test_run_history.py`. |
+| Spreadsheet schema | `scraper/test_export_rows.py`, `evaluator/test_parsing.py`, `evaluator/test_storage.py`. |
+| Evaluator prompt or parsing | `evaluator/test_parsing.py`, `evaluator/test_openai_client.py`. |
+| CV PDF output | `evaluator/test_cv_pdf_output.py`, `evaluator/test_storage.py`. |
+| Pipeline/GitHub settings | `pipeline/test_cli.py`, `scraper/test_settings.py`, `operations/test_runtime_files.py`. |
 
 ## Maintaining Tests
 
@@ -111,7 +95,7 @@ user-facing behavior change.
 
 | Problem | What to check |
 |---|---|
-| `No module named 'jobfinder'` | Run tests from the repository root, or install with `python -m pip install -e .`. |
-| Ruff, mypy, or pytest is missing | Install `requirements-dev.txt`. |
+| `No module named 'jobfinder'` | Run tests from the repository root, or install with `python -m pip install -e ".[all]"`. |
+| Ruff, mypy, or pytest is missing | Run `python -m pip install -e ".[all,dev]"`. |
 | Tests unexpectedly hit real services | Replace the network call with a fake or monkeypatch; tests should not require Apify, Google, or OpenAI credentials. |
-| Config tests fail after editing filters | Validate `configs/filters.json` with `python -m json.tool configs/filters.json`. |
+| Config tests fail after editing filters | Validate `products/jobfinder/config/filters.json` with `python -m json.tool products/jobfinder/config/filters.json`. |

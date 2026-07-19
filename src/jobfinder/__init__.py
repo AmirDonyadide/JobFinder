@@ -1,8 +1,4 @@
-"""JobFinder package.
-
-The package contains the scraping, exporting, evaluation, and pipeline entry
-points used by the thin compatibility scripts in the repository root.
-"""
+"""Shared search and evaluation engine for JobFinder and PhDFinder."""
 
 __all__ = ["__version__"]
 

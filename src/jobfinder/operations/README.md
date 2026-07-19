@@ -4,6 +4,10 @@ This package contains small operational helpers used by local and GitHub Actions
 runs. It keeps reporting behavior in one place so workflow artifacts are useful
 without exposing private job data or credentials.
 
+`runtime_files.py` also gives JobFinder and PhDFinder one tested CI path for
+validating secrets, materializing private product files, and cleaning up only
+manifest-recorded paths.
+
 ## Prerequisites
 
 - Python 3.14 or newer.
@@ -14,7 +18,7 @@ without exposing private job data or credentials.
 Set a report destination, then run a command that writes reports:
 
 ```bash
-JOBFINDER_PIPELINE_REPORT_FILE=reports/pipeline_preflight.json python run_job_pipeline.py --mode scrape_only --preflight
+JOBFINDER_PIPELINE_REPORT_FILE=reports/pipeline_preflight.json jobfinder --mode scrape_only --preflight
 ```
 
 ## Reports
@@ -53,6 +57,18 @@ write_report_from_env(
 
 If the environment variable is not set, no report file is written.
 
+## CI runtime files
+
+GitHub workflows call:
+
+```bash
+PYTHONPATH=src python -m jobfinder.operations.runtime_files prepare
+PYTHONPATH=src python -m jobfinder.operations.runtime_files cleanup
+```
+
+These commands are restricted to GitHub Actions. They never print secret
+values, and cleanup refuses paths outside the selected product's allowlist.
+
 ## Use This For Your Own Project
 
 Forks can add new summary fields, but report payloads should stay sanitized and
@@ -70,5 +86,5 @@ JSON somewhere else, not in report artifacts.
 | Problem | What to check |
 |---|---|
 | No report file appears | Confirm the matching `JOBFINDER_*_REPORT_FILE` variable is set. |
-| Report upload artifact is empty | Confirm the file path is under `reports/` in `.github/workflows/jobs.yml`. |
+| Report upload artifact is empty | Confirm the file path is under `reports/` in `.github/workflows/jobfinder.yml`. |
 | Sensitive text appears in a report | Remove it at the caller. `reports.py` does not know which arbitrary fields are secrets. |

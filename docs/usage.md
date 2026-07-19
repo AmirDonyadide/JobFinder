@@ -1,6 +1,6 @@
 # Usage Guide
 
-This guide covers how to run JobFinder day to day: the commands, the run modes,
+This guide covers how to run JobFinder and PhDFinder day to day: commands, run modes,
 and what the output looks like. For installation, see the
 [Local guide](run-local.md). For every setting, see the
 [Configuration reference](configuration.md).
@@ -21,19 +21,18 @@ Back to the [project overview](../README.md).
 
 ## The two ways to run
 
-JobFinder gives you one combined command, an academic-profile command, and two
-focused commands:
+The repository provides two product commands and two focused shared-engine
+commands:
 
-| Command (root script) | Installed console script | What it does |
-|---|---|---|
-| `python run_job_pipeline.py` | `jobfinder-pipeline` | Scrape **and** (optionally) evaluate in one step. |
-| `python phd_finder.py` | `phdfinder` | Run the same pipeline with the isolated academic-role profile. |
-| `python linkedin_job_scraper.py` | `jobfinder-scrape` | Scrape and export only. |
-| `python job_fit_evaluator.py` | `jobfinder-evaluate` | Evaluate an already-scraped sheet. |
+| Command | What it does |
+|---|---|
+| `jobfinder` | Run the JobFinder product pipeline. |
+| `phdfinder` | Run the PhDFinder product pipeline. |
+| `jobfinder-scrape` | Run only the shared scraper for the selected product. |
+| `jobfinder-evaluate` | Evaluate an already-scraped product output. |
 
-The root scripts and the console scripts are equivalent. Use the console scripts
-after `python -m pip install -e .`; use the root scripts if you prefer not to
-install the package.
+Install the commands with `python -m pip install -e ".[all]"`. Direct module
+execution remains available with `PYTHONPATH=src` for development.
 
 ## The pipeline (recommended)
 
@@ -42,7 +41,7 @@ writes to **Google Sheets**, because the evaluator reads the sheet it just
 created.
 
 ```bash
-python run_job_pipeline.py --help
+jobfinder --help
 ```
 
 | Option | What it does |
@@ -50,37 +49,38 @@ python run_job_pipeline.py --help
 | `--mode scrape_only` | Scrape jobs to Google Sheets and stop. |
 | `--mode scrape_and_evaluate` | Scrape, then score every new row with OpenAI. Resumes an unfinished same-day tab instead of scraping again. |
 | `--preflight` | Validate your settings, credentials, and Google access **without** running anything or spending API credits. |
-| `--profile jobs` / `--profile phd` | Select the normal JobFinder or academic PhDFinder configuration and state. |
+| `--product jobs` / `--product phd` | Select the JobFinder or PhDFinder configuration and state. |
 
 ```bash
 # Always safe to run first — checks your setup
-python run_job_pipeline.py --preflight
+jobfinder --preflight
 
 # Collect jobs only
-python run_job_pipeline.py --mode scrape_only
+jobfinder --mode scrape_only
 
 # Full run: collect + AI scoring + tailored CV PDFs
-python run_job_pipeline.py --mode scrape_and_evaluate
+jobfinder --mode scrape_and_evaluate
 ```
 
 When `--mode` is omitted, the pipeline uses `JOBFINDER_PIPELINE_MODE` (default
 `scrape_and_evaluate`).
 
-For academic roles, `phdfinder` is shorthand for `jobfinder-pipeline --profile
-phd`. See the [PhDFinder guide](phdfinder.md).
+For academic roles, `phdfinder` selects the isolated PhDFinder product. The
+historical `jobfinder-pipeline --profile phd` form remains compatible. See the
+[PhDFinder guide](phdfinder.md).
 
 ## The scraper on its own
 
 The scraper is primarily configured through environment variables and config
-files. Its `--profile` option selects the JobFinder or PhDFinder inputs. This is
+files. Its `--product` option selects the JobFinder or PhDFinder inputs. This is
 the tool to use for **local Excel output**.
 
 ```bash
 # Uses JOBFINDER_SCRAPER_OUTPUT_MODE / SOURCES from your .env
-python linkedin_job_scraper.py
+jobfinder-scrape
 
 # Or set them inline for a one-off run
-JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=linkedin python linkedin_job_scraper.py
+JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=linkedin jobfinder-scrape
 ```
 
 ## The evaluator on its own
@@ -89,7 +89,7 @@ Use the evaluator to score a sheet that already exists (for example, to re-run A
 scoring without scraping again).
 
 ```bash
-python job_fit_evaluator.py --help
+jobfinder-evaluate --help
 ```
 
 | Option | What it does |
@@ -100,10 +100,10 @@ python job_fit_evaluator.py --help
 
 ```bash
 # Score the newest Google Sheet tab
-python job_fit_evaluator.py --source google_sheets --sheet latest
+jobfinder-evaluate --source google_sheets --sheet latest
 
 # Score the newest local Excel worksheet
-python job_fit_evaluator.py --source excel --sheet latest
+jobfinder-evaluate --source excel --sheet latest
 ```
 
 If `--source` is omitted, the evaluator chooses Google Sheets when a spreadsheet

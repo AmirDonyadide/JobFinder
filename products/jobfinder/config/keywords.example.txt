@@ -1,0 +1,3 @@
+# Example search keywords for JobScraper.
+# Copy this file to products/jobfinder/config/keywords.txt and replace these with your own
+# private keywords. Blank lines and lines starting with # are ignored.

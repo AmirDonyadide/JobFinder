@@ -131,7 +131,7 @@ def run_scrape(settings: ScraperSettings) -> ScrapeResult:
         settings.profile.display_name,
         settings.run_started_at.strftime("%Y-%m-%d %H:%M %Z"),
     )
-    LOGGER.info("Finder profile: %s.", settings.profile.key)
+    LOGGER.info("Finder product: %s.", settings.profile.key)
     LOGGER.info(
         "Sources: %s.", ", ".join(source_label(source) for source in job_providers)
     )

@@ -20,7 +20,7 @@ from jobfinder.config_files import (
 )
 from jobfinder.env import EnvSettings
 from jobfinder.paths import ENV_FILE
-from jobfinder.profiles import FinderProfile, profile_from_env, profile_spreadsheet_id
+from jobfinder.products import FinderProduct, product_from_env, product_spreadsheet_id
 
 APIFY_API_TOKEN_ENV = "APIFY_API_TOKEN"
 TOKEN_PLACEHOLDER = "apify_api_XXXXXXXXXXXX"
@@ -205,7 +205,7 @@ class ScraperSettings:
     """Resolved scraper settings from env variables and config files."""
 
     env: EnvSettings
-    profile: FinderProfile
+    profile: FinderProduct
     filter_config: dict[str, Any]
     keywords: list[str]
     apify_api_token: str
@@ -303,11 +303,11 @@ class ScraperSettings:
 def load_scraper_settings(
     env: EnvSettings | None = None,
     *,
-    profile: str | FinderProfile | None = None,
+    profile: str | FinderProduct | None = None,
 ) -> ScraperSettings:
     """Resolve and validate scraper settings."""
     env = env or EnvSettings()
-    finder_profile = profile_from_env(env, profile)
+    finder_profile = product_from_env(env, profile)
     try:
         filter_config = load_filter_config(finder_profile.filters_file)
         keywords = load_keywords(finder_profile.keywords_file)
@@ -408,7 +408,7 @@ def load_scraper_settings(
         apify_api_token=apify_api_tokens[0] if apify_api_tokens else raw_apify_token,
         apify_api_tokens=apify_api_tokens,
         apify_token_pool=ApifyTokenPool(apify_api_tokens),
-        google_spreadsheet_id=profile_spreadsheet_id(env, finder_profile),
+        google_spreadsheet_id=product_spreadsheet_id(env, finder_profile),
         scraper_timezone=scraper_timezone,
         posted_timezone=posted_timezone,
         scraper_tz=scraper_tz,

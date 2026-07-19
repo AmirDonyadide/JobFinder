@@ -15,11 +15,12 @@ from jobfinder.operations.reports import write_report_from_env
 from jobfinder.paths import ENV_FILE, PROJECT_ROOT
 from jobfinder.pipeline.preflight import run_preflight
 from jobfinder.pipeline.resume import find_incomplete_evaluation_sheet
-from jobfinder.profiles import (
-    DEFAULT_PROFILE,
-    PROFILE_ENV,
-    FinderProfile,
-    resolve_profile,
+from jobfinder.products import (
+    DEFAULT_PRODUCT,
+    LEGACY_PRODUCT_ENV,
+    PRODUCT_ENV,
+    FinderProduct,
+    resolve_product,
 )
 from jobfinder.scraper.settings import parse_apify_api_tokens
 
@@ -72,12 +73,17 @@ def resolve_pipeline_profile(
     args: argparse.Namespace,
     local_env: dict[str, str],
     *,
-    default_profile: str = DEFAULT_PROFILE,
-) -> FinderProfile:
-    """Resolve the selected product profile from CLI, env, or entry point."""
-    profile_value = args.profile or setting(local_env, PROFILE_ENV) or default_profile
+    default_profile: str = DEFAULT_PRODUCT,
+) -> FinderProduct:
+    """Resolve the selected product from CLI, env, or entry point."""
+    profile_value = (
+        args.profile
+        or setting(local_env, PRODUCT_ENV)
+        or setting(local_env, LEGACY_PRODUCT_ENV)
+        or default_profile
+    )
     try:
-        return resolve_profile(profile_value)
+        return resolve_product(profile_value)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
 
@@ -119,7 +125,7 @@ def validate_python_dependencies(pipeline_mode: str) -> None:
         packages = ", ".join(missing_packages)
         raise SystemExit(
             f"Missing Python package(s): {packages}. Run this inside your Conda "
-            "environment: python -m pip install -r requirements.txt"
+            'environment: python -m pip install -e ".[all]"'
         )
 
 
@@ -177,16 +183,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
     """Build the pipeline CLI argument parser."""
     parser = argparse.ArgumentParser(
         description=(
-            "Run JobFinder: scrape jobs to Google Sheets, optionally followed by "
-            "OpenAI evaluation."
+            "Run a finder product: scrape opportunities to Google Sheets, "
+            "optionally followed by OpenAI evaluation."
         )
     )
     parser.add_argument(
+        "--product",
         "--profile",
+        dest="profile",
         choices=("jobs", "phd"),
         help=(
-            "Use the standard JobFinder profile or the academic PhDFinder profile. "
-            "Defaults to JOBFINDER_PROFILE or the command's product default."
+            "Select JobFinder or PhDFinder. --profile is retained as an alias. "
+            "Defaults to JOBFINDER_PRODUCT or the command's product default."
         ),
     )
     parser.add_argument(
@@ -214,7 +222,7 @@ def child_pythonpath() -> str:
     return src_path
 
 
-def main(*, default_profile: str = DEFAULT_PROFILE) -> int:
+def main(*, default_profile: str = DEFAULT_PRODUCT) -> int:
     """Run the scraper pipeline in the selected mode."""
     configure_cli_logging()
     args = build_arg_parser().parse_args()
@@ -253,8 +261,8 @@ def main(*, default_profile: str = DEFAULT_PROFILE) -> int:
                 result,
             )
             LOGGER.info(
-                "Preflight complete. profile=%s, sources=%s, output=%s, keywords=%s",
-                result.profile,
+                "Preflight complete. product=%s, sources=%s, output=%s, keywords=%s",
+                result.product,
                 result.source_mode,
                 result.output_mode,
                 result.keyword_count,
@@ -268,8 +276,9 @@ def main(*, default_profile: str = DEFAULT_PROFILE) -> int:
     env["JOBFINDER_SCRAPER_OUTPUT_MODE"] = "google_sheets"
     env["JOBSCRAPER_OUTPUT_MODE"] = "google_sheets"
     env["JOBFINDER_PIPELINE_MODE"] = pipeline_mode
-    env[PROFILE_ENV] = profile.key
-    LOGGER.info("Finder profile: %s (%s).", profile.key, profile.display_name)
+    env[PRODUCT_ENV] = profile.key
+    env[LEGACY_PRODUCT_ENV] = profile.key
+    LOGGER.info("Finder product: %s (%s).", profile.key, profile.display_name)
 
     scrape_command = [sys.executable, "-m", "jobfinder.scraper.cli"]
 
@@ -352,7 +361,7 @@ def main(*, default_profile: str = DEFAULT_PROFILE) -> int:
 
 
 def phd_main() -> int:
-    """Run the shared pipeline with PhDFinder as the default profile."""
+    """Run the shared pipeline with PhDFinder as the default product."""
     return main(default_profile="phd")
 
 

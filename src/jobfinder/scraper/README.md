@@ -6,7 +6,7 @@ job shape, deduplicates them, applies final filters, and exports the result.
 The CLI entry point is:
 
 ```bash
-python linkedin_job_scraper.py
+jobfinder-scrape
 ```
 
 or, after editable install:
@@ -36,7 +36,7 @@ jobfinder-scrape
 - Python 3.14 or newer.
 - Runtime dependencies installed.
 - `APIFY_API_TOKEN`.
-- `configs/keywords.txt` and `configs/filters.json`.
+- `products/jobfinder/config/keywords.txt` and `products/jobfinder/config/filters.json`.
 - Google OAuth and `GOOGLE_SPREADSHEET_ID` only when output includes Google
   Sheets.
 
@@ -45,19 +45,19 @@ jobfinder-scrape
 Scrape LinkedIn to local Excel:
 
 ```bash
-JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=linkedin python linkedin_job_scraper.py
+JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=linkedin jobfinder-scrape
 ```
 
 Scrape all providers to Google Sheets:
 
 ```bash
-JOBFINDER_SCRAPER_OUTPUT_MODE=google_sheets JOBFINDER_SCRAPER_SOURCES=all python linkedin_job_scraper.py
+JOBFINDER_SCRAPER_OUTPUT_MODE=google_sheets JOBFINDER_SCRAPER_SOURCES=all jobfinder-scrape
 ```
 
 Debug one direct-URL provider:
 
 ```bash
-JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=stepstone STEPSTONE_START_URLS="https://www.stepstone.de/jobs/software" python linkedin_job_scraper.py
+JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=stepstone STEPSTONE_START_URLS="https://www.stepstone.de/jobs/software" jobfinder-scrape
 ```
 
 ## Use This For Your Own Project
@@ -67,11 +67,11 @@ Forks usually customize scraper behavior through settings:
 | Need | Change |
 |---|---|
 | Source mix | `JOBFINDER_SCRAPER_SOURCES`. |
-| Private search terms | `configs/keywords.txt` locally or `JOB_KEYWORDS_TEXT` in GitHub Actions. |
-| Geography and provider defaults | `configs/filters.json`, `INDEED_*`, `STEPSTONE_*`, and `XING_*`. |
+| Private search terms | `products/jobfinder/config/keywords.txt` locally or `JOB_KEYWORDS_TEXT` in GitHub Actions. |
+| Geography and provider defaults | `products/jobfinder/config/filters.json`, `INDEED_*`, `STEPSTONE_*`, and `XING_*`. |
 | Cost and speed | `*_MAX_RESULTS_PER_SEARCH`, `JOBFINDER_SCRAPER_SEARCH_CONCURRENCY`, and provider concurrency caps. |
 | Historical window behavior | `JOBFINDER_SCRAPER_POSTED_TIME_WINDOW` and `JOBFINDER_SCRAPER_SEARCH_WINDOW_BUFFER_SECONDS`. |
-| Final filters | `configs/filters.json` `final_filters` and `JOBFINDER_SCRAPER_MAX_APPLICANTS`. |
+| Final filters | `products/jobfinder/config/filters.json` `final_filters` and `JOBFINDER_SCRAPER_MAX_APPLICANTS`. |
 
 Use `JOBFINDER_SCRAPER_OUTPUT_MODE=excel` for cheap local debugging before
 enabling Google Sheets and evaluation.
@@ -215,7 +215,7 @@ Excel export:
 | Problem | What to check |
 |---|---|
 | `Missing required setting: APIFY_API_TOKEN` | Set `APIFY_API_TOKEN` in `.env`, the shell, or a GitHub secret. |
-| No searches are configured | Create `configs/keywords.txt` with at least one keyword; settings load requires it even when Stepstone or Xing direct URL mode is configured. |
+| No searches are configured | Create `products/jobfinder/config/keywords.txt` with at least one keyword; settings load requires it even when Stepstone or Xing direct URL mode is configured. |
 | No jobs found | Check keywords, source selection, geography, posted-time window, and final filters. |
 | Apify timeouts or 5xx errors | Lower concurrency or max results, increase timeout, or retry later. |
 | Google Sheets export fails | Confirm OAuth token scopes, spreadsheet ID, and account access. |

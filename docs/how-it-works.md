@@ -1,8 +1,8 @@
-# How JobFinder Works
+# How the finder engine works
 
-This guide explains what happens inside a run, from your keywords to the final
-sheet. It is useful if you want to understand the pipeline, tune it, or extend
-it. For module ownership and design direction, see the
+This guide explains what happens inside a JobFinder or PhDFinder run, from the
+selected product's keywords to its isolated output. For module ownership and
+design direction, see the
 [Architecture notes](architecture.md).
 
 Back to the [project overview](../README.md) · [Developer guide](developer-guide.md).
@@ -11,7 +11,7 @@ Back to the [project overview](../README.md) · [Developer guide](developer-guid
 
 ```mermaid
 flowchart LR
-    A["configs/keywords.txt<br/>configs/filters.json<br/>.env / secrets"] --> B["ScraperSettings"]
+    A["selected products/&lt;name&gt; files<br/>.env / secrets"] --> B["FinderProduct + ScraperSettings"]
     B --> C["Search builder<br/>scraper/search.py"]
     C --> D["Apify actors<br/>LinkedIn / Indeed / Stepstone / Xing"]
     D --> E["Provider normalizers"]
@@ -35,7 +35,7 @@ flowchart LR
 | Run history | `scraper/run_history.py` | Read prior tabs, derive previous-run windows, maintain seen-job keys. |
 | Evaluation | `evaluator/` | Build prompts, call OpenAI, parse, save, clean output. |
 | Pipeline | `pipeline/` | Run scraper then evaluator, plus preflight. |
-| Operations | `operations/reports.py` | Sanitized JSON reports for CI artifacts. |
+| Operations | `operations/` | Sanitized JSON reports and manifest-scoped CI private files. |
 
 ## The job boards
 
@@ -53,7 +53,7 @@ The stable adapter surface lives in `src/jobfinder/providers`. The
 
 ## Scraping flow
 
-1. `load_scraper_settings()` reads `configs/filters.json`, `configs/keywords.txt`, `.env`, and real environment variables.
+1. Product resolution selects `products/jobfinder/` or `products/phdfinder/`, then `load_scraper_settings()` reads that product's filters, keywords, `.env`, and real environment variables.
 2. If Google Sheets output is on, the scraper authenticates first and reads spreadsheet history.
 3. The posted-time window is applied:
    - `since_previous_run` uses the newest prior tab (plus a buffer) as a broad search window.
@@ -107,7 +107,7 @@ ID is configured, otherwise Excel).
 2. Ensure the AI columns exist: `AI Verdict`, `AI Fit Score`, `AI Unsuitable Reasons`, `AI Tailored CV`, `AI CV PDF`.
 3. Skip rows that already have a non-`Error` `AI Verdict`.
 4. Build each job advertisement from useful row columns (excluding URLs, status fields, and existing AI output).
-5. Compose the model input from `prompts/master_prompt.txt`, the row advertisement, and `cv/master_cv.tex`.
+5. Compose the model input from the selected product's evaluator prompt, the row advertisement, and its Master CV.
 6. Call the OpenAI Responses API with strict machine-readable output instructions.
 7. Parse the verdict, fit score, unsuitable reasons, and optional tailored LaTeX CV.
 8. Save each completed evaluation immediately (or in batches via `JOB_EVAL_SAVE_BATCH_SIZE`).
@@ -122,7 +122,7 @@ ID is configured, otherwise Excel).
     to `AI CV PDF`.
 12. Finalize by removing detail columns such as `Job Description` and the
     temporary `AI Tailored CV` column.
-11. Apply `JOB_EVAL_UNSUITABLE_ROW_POLICY`.
+13. Apply `JOB_EVAL_UNSUITABLE_ROW_POLICY`.
 
 ## A note on output durability
 

@@ -197,7 +197,7 @@ def upload_pdf_to_drive(
     except ImportError as exc:
         raise RuntimeError(
             "Missing Google API upload support. Install dependencies with: "
-            "python -m pip install -r requirements.txt"
+            'python -m pip install -e ".[google]"'
         ) from exc
 
     media = MediaFileUpload(

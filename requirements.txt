@@ -1,3 +1,0 @@
--r requirements-scraper.txt
--r requirements-evaluator.txt
--r requirements-google.txt

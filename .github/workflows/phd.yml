@@ -60,7 +60,7 @@ jobs:
     environment: phdfinder
 
     env:
-      JOBFINDER_PROFILE: phd
+      JOBFINDER_PRODUCT: phd
       APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       PHDFINDER_GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
@@ -84,7 +84,7 @@ jobs:
       JOB_EVAL_CONCURRENCY: "8"
       JOB_EVAL_BATCH_SIZE: "40"
       JOB_EVAL_CV_PDF_OUTPUT: ${{ inputs.cv_pdf_output }}
-      JOB_EVAL_CV_PHOTO_FILE: profiles/phd/photo.png
+      JOB_EVAL_CV_PHOTO_FILE: products/phdfinder/evaluator/photo.png
       JOB_EVAL_CV_MAX_PAGES: "2"
       JOB_EVAL_CV_PDF_TIMEOUT: "120"
       JOB_EVAL_UNSUITABLE_ROW_POLICY: keep_all
@@ -103,20 +103,17 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-          cache-dependency-path: |
-            requirements-scraper.txt
-            requirements-evaluator.txt
-            requirements-google.txt
+          cache-dependency-path: pyproject.toml
 
       - name: Install scraper and Google dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements-scraper.txt
-          python -m pip install -r requirements-google.txt
+          python -m pip install -e ".[scraper]"
+          python -m pip install -e ".[google]"
 
       - name: Install evaluator dependencies
         if: inputs.run_mode == 'scrape_and_evaluate'
-        run: python -m pip install -r requirements-evaluator.txt
+        run: python -m pip install -e ".[evaluator]"
 
       - name: Install LaTeX tools
         if: inputs.run_mode == 'scrape_and_evaluate' && inputs.cv_pdf_output == 'true'
@@ -124,106 +121,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y latexmk texlive-xetex texlive-latex-extra
 
-      - name: Validate PhDFinder environment secrets
+      - name: Validate secrets and prepare private runtime files
         shell: bash
-        run: |
-          set -euo pipefail
-
-          missing=0
-          for name in APIFY_API_TOKEN PHDFINDER_GOOGLE_SPREADSHEET_ID GOOGLE_TOKEN_JSON JOB_KEYWORDS_TEXT; do
-            if [ -z "${!name:-}" ]; then
-              echo "::error::Missing ${name} in the phdfinder GitHub Environment."
-              missing=1
-            fi
-          done
-
-          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ]; then
-            for name in OPENAI_API_KEY MASTER_PROMPT_TEXT MASTER_CV_TEX; do
-              if [ -z "${!name:-}" ]; then
-                echo "::error::Missing ${name} in the phdfinder GitHub Environment."
-                missing=1
-              fi
-            done
-          fi
-
-          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ] && \
-             [ "${JOB_EVAL_CV_PDF_OUTPUT}" = "true" ] && \
-             [ -z "${PHDFINDER_CV_DRIVE_FOLDER_ID}" ]; then
-            echo "::error::Missing JOB_EVAL_CV_DRIVE_FOLDER_ID in the phdfinder GitHub Environment."
-            missing=1
-          fi
-
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
-
-      - name: Write private PhDFinder inputs
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          python - <<'PY'
-          import base64
-          import binascii
-          import json
-          import os
-          from pathlib import Path
-
-          profile_dir = Path("profiles/phd")
-          profile_dir.mkdir(parents=True, exist_ok=True)
-          (profile_dir / "keywords.txt").write_text(
-              os.environ["JOB_KEYWORDS_TEXT"].strip() + "\n",
-              encoding="utf-8",
-          )
-
-          if os.environ["JOBFINDER_PIPELINE_MODE"] == "scrape_and_evaluate":
-              (profile_dir / "master_prompt.txt").write_text(
-                  os.environ["MASTER_PROMPT_TEXT"].strip() + "\n",
-                  encoding="utf-8",
-              )
-              (profile_dir / "master_cv.tex").write_text(
-                  os.environ["MASTER_CV_TEX"].strip() + "\n",
-                  encoding="utf-8",
-              )
-
-          token_json = os.environ["GOOGLE_TOKEN_JSON"].strip()
-          try:
-              token = json.loads(token_json)
-          except json.JSONDecodeError as exc:
-              raise SystemExit(f"GOOGLE_TOKEN_JSON is not valid JSON: {exc}") from exc
-          required = ("client_id", "client_secret", "refresh_token")
-          if token.get("type") != "authorized_user" and not all(
-              token.get(name) for name in required
-          ):
-              raise SystemExit("GOOGLE_TOKEN_JSON is not an authorized-user token.")
-
-          Path("google_token.json").write_text(token_json, encoding="utf-8")
-          (profile_dir / "google_spreadsheet_id.txt").write_text(
-              os.environ["PHDFINDER_GOOGLE_SPREADSHEET_ID"].strip(),
-              encoding="utf-8",
-          )
-
-          photo = "".join(os.environ.get("CV_PHOTO_BASE64", "").split())
-          if photo and os.environ.get("JOB_EVAL_CV_PDF_OUTPUT") == "true":
-              try:
-                  photo_bytes = base64.b64decode(photo, validate=True)
-              except binascii.Error as exc:
-                  raise SystemExit(f"CV_PHOTO_BASE64 is not valid base64: {exc}") from exc
-              (profile_dir / "photo.png").write_bytes(photo_bytes)
-          PY
-
-          chmod 600 google_token.json profiles/phd/google_spreadsheet_id.txt
+        run: PYTHONPATH=src python -m jobfinder.operations.runtime_files prepare
 
       - name: Preflight PhDFinder configuration and access
-        run: python -u run_job_pipeline.py --profile phd --mode "${JOBFINDER_PIPELINE_MODE}" --preflight
+        run: phdfinder --mode "${JOBFINDER_PIPELINE_MODE}" --preflight
 
       - name: Run PhDFinder
         shell: bash
         run: |
           set -o pipefail
           mkdir -p reports
-          python -u run_job_pipeline.py \
-            --profile phd \
+          phdfinder \
             --mode "${JOBFINDER_PIPELINE_MODE}" \
             2>&1 | tee phdfinder.log
 
@@ -235,7 +145,7 @@ jobs:
           {
             echo "# PhDFinder Run Summary"
             echo
-            echo "- Profile: phd"
+            echo "- Product: PhDFinder"
             echo "- Pipeline mode: ${JOBFINDER_PIPELINE_MODE}"
             echo "- Sources: ${JOBFINDER_SCRAPER_SOURCES}"
             echo "- Posted-time window: ${JOBFINDER_SCRAPER_POSTED_TIME_WINDOW}"
@@ -258,12 +168,6 @@ jobs:
         if: always()
         shell: bash
         run: |
-          rm -f \
-            profiles/phd/keywords.txt \
-            profiles/phd/master_prompt.txt \
-            profiles/phd/master_cv.tex \
-            profiles/phd/photo.png \
-            profiles/phd/google_spreadsheet_id.txt \
-            google_token.json \
-            phdfinder.log
+          PYTHONPATH=src python -m jobfinder.operations.runtime_files cleanup
+          rm -f phdfinder.log
           rm -rf reports

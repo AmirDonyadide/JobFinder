@@ -145,7 +145,7 @@ class OpenAIJobEvaluator:
         except ImportError as exc:
             raise EvaluationError(
                 "Missing OpenAI Python SDK. Install dependencies with: "
-                "python -m pip install -r requirements.txt"
+                'python -m pip install -e ".[evaluator]"'
             ) from exc
 
         self.model = model

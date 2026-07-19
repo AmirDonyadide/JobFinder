@@ -17,7 +17,7 @@ from jobfinder.dedupe import deduplicate_search_results
 ## Quick Start
 
 ```bash
-python -m pytest tests/test_dedupe_matching.py tests/test_scraper_normalize.py
+python -m pytest tests/dedupe/test_matching.py tests/scraper/test_normalize.py
 ```
 
 Minimal usage:
@@ -134,7 +134,7 @@ Current thresholds are defined in `matching.py`:
 Run:
 
 ```bash
-python -m pytest tests/test_dedupe_matching.py tests/test_scraper_normalize.py
+python -m pytest tests/dedupe/test_matching.py tests/scraper/test_normalize.py
 ```
 
 Update tests whenever identity fields, thresholds, or merge precedence change.
@@ -151,7 +151,7 @@ When changing matching behavior, update:
 - `scoring.py` for similarity and conflict checks.
 - `matching.py` for thresholds and match stages.
 - `merge.py` for canonical row precedence.
-- `tests/test_dedupe_matching.py` for examples of the intended behavior.
+- `tests/dedupe/test_matching.py` for examples of the intended behavior.
 
 ## Troubleshooting
 

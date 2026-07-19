@@ -12,7 +12,7 @@ Back to the [project overview](../README.md) · [Usage guide](usage.md) ·
 Scrape LinkedIn to a local Excel file. Only an Apify token is required.
 
 ```bash
-JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=linkedin python linkedin_job_scraper.py
+JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=linkedin jobfinder-scrape
 ```
 
 Open the resulting `jobs.xlsx`.
@@ -23,13 +23,13 @@ Preflight validates settings, credentials, and Google access without spending
 any API credits.
 
 ```bash
-python run_job_pipeline.py --mode scrape_only --preflight
+jobfinder --mode scrape_only --preflight
 ```
 
 ## Collect jobs from every board into Google Sheets
 
 ```bash
-JOBFINDER_SCRAPER_SOURCES=all python run_job_pipeline.py --mode scrape_only
+JOBFINDER_SCRAPER_SOURCES=all jobfinder --mode scrape_only
 ```
 
 A new dated tab appears in your configured Google Sheet.
@@ -37,7 +37,7 @@ A new dated tab appears in your configured Google Sheet.
 ## Full daily run: scrape + AI scoring + CV PDFs
 
 ```bash
-python run_job_pipeline.py --mode scrape_and_evaluate
+jobfinder --mode scrape_and_evaluate
 ```
 
 This scrapes to Google Sheets, scores each new job with OpenAI, and writes a
@@ -48,7 +48,7 @@ tailored CV PDF link into the `AI CV PDF` column.
 Useful after editing your prompt or CV.
 
 ```bash
-python job_fit_evaluator.py --source google_sheets --sheet latest
+jobfinder-evaluate --source google_sheets --sheet latest
 ```
 
 > The evaluator skips rows that already have an `AI Verdict` (unless it is
@@ -60,7 +60,7 @@ By default the final sheet drops most `Not Suitable` rows. Keep them all while
 you tune your prompt:
 
 ```bash
-JOB_EVAL_UNSUITABLE_ROW_POLICY=keep_all python job_fit_evaluator.py --source google_sheets --sheet latest
+JOB_EVAL_UNSUITABLE_ROW_POLICY=keep_all jobfinder-evaluate --source google_sheets --sheet latest
 ```
 
 ## Debug with low concurrency
@@ -68,7 +68,7 @@ JOB_EVAL_UNSUITABLE_ROW_POLICY=keep_all python job_fit_evaluator.py --source goo
 Slower, but easier to read in the terminal and gentler on provider rate limits.
 
 ```bash
-JOBFINDER_SCRAPER_SEARCH_CONCURRENCY=2 JOBFINDER_SCRAPER_OUTPUT_MODE=excel python linkedin_job_scraper.py
+JOBFINDER_SCRAPER_SEARCH_CONCURRENCY=2 JOBFINDER_SCRAPER_OUTPUT_MODE=excel jobfinder-scrape
 ```
 
 ## Search a single Stepstone or Xing URL
@@ -80,12 +80,12 @@ run one search for the exact URL you provide.
 # Stepstone
 JOBFINDER_SCRAPER_SOURCES=stepstone \
   STEPSTONE_START_URLS="https://www.stepstone.de/jobs/software" \
-  python linkedin_job_scraper.py
+  jobfinder-scrape
 
 # Xing
 JOBFINDER_SCRAPER_SOURCES=xing \
   XING_START_URL="https://www.xing.com/jobs/t-remote?keywords=Remote&location=Germany" \
-  python linkedin_job_scraper.py
+  jobfinder-scrape
 ```
 
 ## Backfill an empty spreadsheet
@@ -94,7 +94,7 @@ For a first run with no history, remove the posting-date filter so you collect a
 wide initial batch.
 
 ```bash
-JOBFINDER_SCRAPER_POSTED_TIME_WINDOW=backfill python run_job_pipeline.py --mode scrape_only
+JOBFINDER_SCRAPER_POSTED_TIME_WINDOW=backfill jobfinder --mode scrape_only
 ```
 
 Switch back to `since_previous_run` for routine daily runs.

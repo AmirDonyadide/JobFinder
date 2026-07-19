@@ -1,33 +1,24 @@
-# JobFinder Documentation
+# Documentation
 
-Welcome to the JobFinder docs. Pick a guide based on what you want to do.
-For a project overview, go back to the [main README](../README.md).
+The repository contains two products backed by one engine. Start with the
+product guide that matches the search you want to run:
 
-## Getting started
+- [JobFinder](../products/jobfinder/README.md)
+- [PhDFinder](../products/phdfinder/README.md)
 
-| Guide | Use it when… |
-|---|---|
-| [Quick Start](quick-start.md) | You want results fast and prefer **no coding** — fork it and run on GitHub. |
-| [Run locally](run-local.md) | You want to run JobFinder **from your own machine**. |
-| [Run on GitHub Actions](run-github-actions.md) | You want **scheduled, hands-off** runs in the cloud. |
+## Run a product
 
-## Using JobFinder
+- [Quick start](quick-start.md) — shortest GitHub Actions setup.
+- [Run locally](run-local.md) — installation, private files, and OAuth setup.
+- [Run with GitHub Actions](run-github-actions.md) — secrets, schedules, and artifacts.
+- [Usage](usage.md) — commands, modes, sources, and outputs.
+- [Examples](examples.md) — common command recipes.
+- [Configuration](configuration.md) — environment variables and product files.
+- [Troubleshooting](troubleshooting.md) — common failures and recovery.
 
-| Guide | What's inside |
-|---|---|
-| [Usage guide](usage.md) | Every command, the two run modes, and the output columns. |
-| [Examples & workflows](examples.md) | Ready-to-copy commands for common situations. |
-| [Configuration reference](configuration.md) | Every environment variable and config file. |
-| [Troubleshooting](troubleshooting.md) | Fixes for the most common errors. |
+## Understand or extend the engine
 
-## Going deeper (developers)
-
-| Guide | What's inside |
-|---|---|
-| [How it works](how-it-works.md) | The scraping, dedupe, history, and evaluation flow. |
-| [Architecture](architecture.md) | Module ownership, boundaries, and design direction. |
-| [Apify scraper audit](apify-scraper-audit.md) | Current actor schemas, parser compatibility, and live smoke-test commands. |
-| [Developer guide](developer-guide.md) | Local setup, CI checks, testing, and extension points. |
-
-The deepest reference lives next to the code: each module under
-`src/jobfinder/*/README.md` documents its own responsibilities.
+- [How it works](how-it-works.md) — end-to-end data flow.
+- [Architecture](architecture.md) — product boundaries and shared modules.
+- [Developer guide](developer-guide.md) — setup, checks, and extension points.
+- [Apify integration audit](apify-scraper-audit.md) — dated provider evidence.

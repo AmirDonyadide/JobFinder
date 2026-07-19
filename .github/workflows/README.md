@@ -1,164 +1,91 @@
-# GitHub Workflows
+# GitHub workflows
 
-This directory contains the repository's CI workflow and production JobFinder
-pipeline workflow. Forks use these files to test changes and to run scheduled
-job searches without keeping a local machine online.
+The repository has one quality workflow and two isolated product workflows.
 
-## Prerequisites
+| Workflow | Product | Trigger | State boundary |
+|---|---|---|---|
+| `ci.yml` | Shared engine and both products | Push and pull request | No live credentials or network calls |
+| `jobfinder.yml` | JobFinder | Manual and daily schedule | Repository secrets, JobFinder spreadsheet/history/reports |
+| `phd.yml` | PhDFinder | Manual only | `phdfinder` environment, PhDFinder spreadsheet/history/reports |
 
-- GitHub Actions enabled for the repository.
-- Repository secrets configured before running `jobs.yml`.
-- Python 3.14 compatibility for code and tests.
+## Shared behavior
 
-## Quick Start
+Both product workflows:
 
-For CI, open a pull request or push to `main`; `.github/workflows/ci.yml` runs
-automatically.
+1. Install dependency groups from `pyproject.toml`.
+2. Resolve whether evaluation, Google APIs, and LaTeX are needed.
+3. Call `jobfinder.operations.runtime_files prepare` to validate secrets and
+   materialize private product files.
+4. Run product-aware preflight.
+5. Run the selected scrape or scrape-and-evaluate mode.
+6. Upload sanitized reports and product-specific artifacts.
+7. Call `jobfinder.operations.runtime_files cleanup`, which removes only paths
+   recorded in the matching preparation manifest.
 
-For the production job search:
+The shared preparation code validates Apify token count, required product
+inputs, OpenAI requirements, Google authorized-user JSON and scopes,
+product-specific spreadsheet IDs, Drive folder IDs, and optional photo base64.
+Secret values are never printed.
 
-1. Add the secrets listed in [Required Secrets](#required-secrets).
-2. Open **Actions -> JobFinder Pipeline -> Run workflow**.
-3. Choose sources, posted-time window, applicant cap, run mode, and row policy.
-4. Read the created Google Sheet tab and the `jobfinder-run-reports` artifact.
+## Product differences
 
-## Use This For Your Own Project
-
-When forking, review these workflow-specific settings:
-
-| Setting | Where |
-|---|---|
-| Schedule | `jobs.yml` `on.schedule` cron entries. |
-| Search defaults | `jobs.yml` `workflow_dispatch.inputs` and job `env`. |
-| Germany-specific provider defaults | `INDEED_COUNTRY`, `INDEED_LOCATION`, `STEPSTONE_LOCATION`, `XING_LOCATION`, and `configs/filters.json`. |
-| Generated CV filename applicant name | `JOB_EVAL_CV_PDF_APPLICANT_NAME` in `jobs.yml`. |
-| Required secrets | `Validate required secrets` step and this README. |
-| CI quality gates | `ci.yml` steps. |
-
-Keep private values in repository secrets. Do not commit generated private files
-that the workflow writes at runtime.
-
-## `ci.yml`
-
-Runs on:
-
-- Pull requests.
-- Pushes to `main`.
-
-Checks:
-
-1. Checkout.
-2. Set up Python 3.14 with pip cache.
-3. Install `requirements-dev.txt`.
-4. Run Ruff lint.
-5. Run Ruff formatting check.
-6. Run mypy on `src`.
-7. Compile Python files.
-8. Smoke-test CLI help with `PYTHONPATH=src`.
-9. Validate `configs/filters.json`.
-10. Run `pytest`.
-
-This workflow does not require Apify, Google, or OpenAI secrets. Tests use fakes
-and monkeypatching for external services. It does not install LaTeX because the
-current PDF tests mock the compiler instead of producing real PDFs.
-
-## `jobs.yml`
-
-Runs JobFinder in GitHub Actions.
-
-Triggers:
-
-- Manual `workflow_dispatch`.
-- One scheduled run each day at 10:27 `Europe/Berlin`
-  (`27 10 * * *` with an explicit timezone).
-
-Manual inputs:
-
-| Input | Options |
-|---|---|
-| `sources` | `linkedin`, `indeed`, `stepstone`, `xing`, `all` |
-| `posted_time_window` | `since_previous_run`, `last_24h`, `last_7d`, `backfill` |
-| `max_applicants` | `50`, `100`, `200`, `no_limit` |
-| `run_mode` | `scrape_and_evaluate`, `scrape_only` |
-| `output_mode` | `google_sheets`, `excel` |
-| `cv_pdf_output` | `true`, `false` |
-| `unsuitable_rows` | `single_label_only`, `keep_all` |
-
-## Production Job Flow
-
-```mermaid
-flowchart TD
-    A["checkout"] --> B["setup Python 3.14"]
-    B --> C["resolve workflow plan"]
-    C --> D["install scraper dependencies"]
-    D --> E{"evaluator?"}
-    E -- yes --> F["install evaluator dependencies"]
-    E -- no --> G["skip evaluator dependencies"]
-    F --> H{"Google needed?"}
-    G --> H
-    H -- yes --> I["install Google dependencies and write token"]
-    H -- no --> J["skip Google setup"]
-    I --> K{"PDF output?"}
-    J --> K
-    K -- yes --> L["install LaTeX tools"]
-    K -- no --> M["skip LaTeX"]
-    L --> N["run pipeline or direct scraper"]
-    M --> N
-    N --> O["upload report artifacts"]
-    O --> P["remove private runtime files"]
-```
-
-Scheduled runs keep `google_sheets`, `scrape_and_evaluate`, and PDF output
-enabled. Manual runs can choose lighter combinations. For example,
-`run_mode=scrape_only`, `output_mode=excel`, and `sources=linkedin` installs only
-scraper dependencies and runs the direct scraper CLI.
-
-## Required Secrets
-
-| Secret | Required when | Description |
+| Setting | JobFinder | PhDFinder |
 |---|---|---|
-| `APIFY_API_TOKEN` | Always | One Apify token or up to 12 semicolon-separated tokens. |
-| `GOOGLE_SPREADSHEET_ID` | Google Sheets output or `scrape_and_evaluate` | Target spreadsheet ID. |
-| `GOOGLE_TOKEN_JSON` | Google Sheets output or `scrape_and_evaluate` | Full authorized-user token JSON from `google_token.json` for Sheets and Drive. |
-| `JOB_EVAL_CV_DRIVE_FOLDER_ID` | `scrape_and_evaluate` with `cv_pdf_output=true` | Drive folder ID for generated CV PDF run folders. |
-| `JOB_KEYWORDS_TEXT` | Always | Contents of private `configs/keywords.txt`. |
-| `OPENAI_API_KEY` | `scrape_and_evaluate` | OpenAI API key. |
-| `MASTER_PROMPT_TEXT` | `scrape_and_evaluate` | Contents of private evaluator prompt. |
-| `MASTER_CV_TEX` | `scrape_and_evaluate` | Contents of private LaTeX CV. |
-| `CV_PHOTO_BASE64` | Optional when PDF output is enabled | Base64-encoded private CV photo for LaTeX PDF generation. |
+| Internal key | `jobs` | `phd` |
+| Workflow environment | Repository secrets | GitHub Environment `phdfinder` |
+| Schedule | Daily plus manual | Manual only by default |
+| Applicant cap | Workflow input | Disabled by default |
+| Default posted window | Since previous run | Last seven days |
+| Unsuitable-row policy | Workflow input | Keep all |
+| Report artifact | `jobfinder-run-reports` | `phdfinder-run-reports` |
+| Concurrency group | `jobfinder-pipeline` | `phdfinder-pipeline` |
 
-## Report Artifacts
+## Required secrets
 
-`jobs.yml` uploads `jobfinder-run-reports` with:
+Every run needs:
 
-- `reports/pipeline_preflight.json`
+- `APIFY_API_TOKEN`
+- `JOB_KEYWORDS_TEXT`
+
+Google Sheets output also needs:
+
+- `GOOGLE_TOKEN_JSON`
+- `GOOGLE_SPREADSHEET_ID`
+
+Evaluation adds:
+
+- `OPENAI_API_KEY`
+- `MASTER_PROMPT_TEXT`
+- `MASTER_CV_TEX`
+
+Generated PDFs add:
+
+- `JOB_EVAL_CV_DRIVE_FOLDER_ID`
+- `CV_PHOTO_BASE64` when a private photo is required
+
+The same secret names are used for both workflows, but PhDFinder values belong
+in its GitHub Environment and must point to PhDFinder-only resources.
+
+## Reports and diagnostics
+
+Always inspect the uploaded report artifact when output is empty or sparse. A
+green workflow conclusion does not prove that every provider returned jobs.
+Useful evidence includes:
+
 - `reports/scraper.json`
-- `reports/evaluator.json`
-- `reports/workflow_summary.md`
+- `failed_sources`
+- `unique_job_count`
+- evaluator and preflight reports
+- the workflow summary and raw job log
 
-Reports are generated only when the corresponding env var path is configured.
-Excel-only manual scraper runs also upload `jobs.xlsx` as the
-`jobfinder-excel-output` artifact when the workbook is created.
+Do not remove these reports while simplifying workflow code; they are the
+primary boundary between workflow success and actual data success.
 
-## Operational Constraints
+## Safe changes
 
-- `concurrency.cancel-in-progress` is `false`, so scheduled/manual runs do not
-  cancel an already running pipeline.
-- Scheduled runs execute once daily at 10:27 `Europe/Berlin` time.
-  `daily-run-gate` still prevents an additional scheduled execution after one
-  already succeeded for the current Berlin day.
-- The job timeout is 360 minutes.
-- Scheduled runs use default workflow inputs, not the last manual selections.
-- The workflow writes Google OAuth token JSON to a temporary runner file and
-  applies restrictive file permissions before use.
-- Do not echo secret values while debugging.
-
-## Troubleshooting
-
-| Problem | What to check |
-|---|---|
-| CI cannot import `jobfinder` | Confirm `PYTHONPATH=src` is still present in smoke tests, or install the package before running module commands. |
-| Production workflow fails before scraping | Check the `Validate required secrets` step for the exact missing secret. |
-| Scheduled run did not create a tab | Check whether `daily-run-gate` skipped it because a scheduled run already succeeded that Berlin day. |
-| Workflow uses the wrong geography or applicant name | Update `jobs.yml` env values and `configs/filters.json` in the fork. |
-| Report artifact is missing | Confirm `JOBFINDER_*_REPORT_FILE` env vars still point under `reports/` and the upload step has not been removed. |
+- Change schedules only in the matching product workflow.
+- Keep concurrency groups and artifact names product-specific.
+- Put common secret-file behavior in `operations/runtime_files.py`, not copied
+  inline Python blocks.
+- Validate both product filter JSON files in CI.
+- Keep PhDFinder manual-only until recurring Apify/OpenAI cost is accepted.
