@@ -16,6 +16,11 @@ duplicates, filters out the noise, and saves the results to **Excel or Google
 Sheets**. If you want, it then asks **OpenAI** to score each job against your own
 CV and generate a tailored CV PDF for the good matches.
 
+The same tested engine also powers an optional **PhDFinder** profile for PhD,
+doctoral researcher, and research-assistant roles. It keeps academic keywords,
+filters, evaluator instructions, CV inputs, spreadsheet history, and workflow
+state separate without maintaining a copied repository or long-lived branch.
+
 You can run it once from your laptop, or let **GitHub Actions** run it for you on
 a daily schedule — no computer required.
 
@@ -152,6 +157,7 @@ what you need.
 **Using it**
 
 - 📖 [Usage guide](docs/usage.md) — commands, run modes, and output columns.
+- 🎓 [PhDFinder](docs/phdfinder.md) — configure and run the academic-role profile.
 - 🧩 [Examples & common workflows](docs/examples.md) — copy-paste recipes.
 - ⚙️ [Configuration reference](docs/configuration.md) — every setting and config file.
 - 🛟 [Troubleshooting](docs/troubleshooting.md) — fixes for common errors.

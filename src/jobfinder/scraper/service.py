@@ -123,13 +123,15 @@ def run_scrape(settings: ScraperSettings) -> ScrapeResult:
     search_plan_summary, searches = get_searches(settings, job_providers)
     if not searches:
         raise ScraperServiceError(
-            "No searches configured. Add keywords to configs/keywords.txt."
+            f"No searches configured. Add keywords to {settings.profile.keywords_file}."
         )
 
     LOGGER.info(
-        "JobScraper started at %s.",
+        "%s scraper started at %s.",
+        settings.profile.display_name,
         settings.run_started_at.strftime("%Y-%m-%d %H:%M %Z"),
     )
+    LOGGER.info("Finder profile: %s.", settings.profile.key)
     LOGGER.info(
         "Sources: %s.", ", ".join(source_label(source) for source in job_providers)
     )

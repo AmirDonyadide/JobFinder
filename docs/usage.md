@@ -21,11 +21,13 @@ Back to the [project overview](../README.md).
 
 ## The two ways to run
 
-JobFinder gives you one combined command plus two focused commands:
+JobFinder gives you one combined command, an academic-profile command, and two
+focused commands:
 
 | Command (root script) | Installed console script | What it does |
 |---|---|---|
 | `python run_job_pipeline.py` | `jobfinder-pipeline` | Scrape **and** (optionally) evaluate in one step. |
+| `python phd_finder.py` | `phdfinder` | Run the same pipeline with the isolated academic-role profile. |
 | `python linkedin_job_scraper.py` | `jobfinder-scrape` | Scrape and export only. |
 | `python job_fit_evaluator.py` | `jobfinder-evaluate` | Evaluate an already-scraped sheet. |
 
@@ -48,6 +50,7 @@ python run_job_pipeline.py --help
 | `--mode scrape_only` | Scrape jobs to Google Sheets and stop. |
 | `--mode scrape_and_evaluate` | Scrape, then score every new row with OpenAI. Resumes an unfinished same-day tab instead of scraping again. |
 | `--preflight` | Validate your settings, credentials, and Google access **without** running anything or spending API credits. |
+| `--profile jobs` / `--profile phd` | Select the normal JobFinder or academic PhDFinder configuration and state. |
 
 ```bash
 # Always safe to run first — checks your setup
@@ -63,11 +66,14 @@ python run_job_pipeline.py --mode scrape_and_evaluate
 When `--mode` is omitted, the pipeline uses `JOBFINDER_PIPELINE_MODE` (default
 `scrape_and_evaluate`).
 
+For academic roles, `phdfinder` is shorthand for `jobfinder-pipeline --profile
+phd`. See the [PhDFinder guide](phdfinder.md).
+
 ## The scraper on its own
 
-The scraper has no command-line flags — it is configured entirely through
-environment variables and config files. This is the tool to use for **local
-Excel output**.
+The scraper is primarily configured through environment variables and config
+files. Its `--profile` option selects the JobFinder or PhDFinder inputs. This is
+the tool to use for **local Excel output**.
 
 ```bash
 # Uses JOBFINDER_SCRAPER_OUTPUT_MODE / SOURCES from your .env

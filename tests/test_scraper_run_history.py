@@ -8,6 +8,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from jobfinder.env import EnvSettings
+from jobfinder.profiles import resolve_profile
 from jobfinder.scraper.run_history import (
     SEEN_JOBS_SHEET_NAME,
     apply_configured_posted_time_window,
@@ -27,6 +28,7 @@ def make_settings(run_started_at: datetime) -> ScraperSettings:
     berlin = ZoneInfo("Europe/Berlin")
     return ScraperSettings(
         env=EnvSettings({}),
+        profile=resolve_profile("jobs"),
         filter_config={},
         keywords=["GIS"],
         apify_api_token="token",

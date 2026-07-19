@@ -43,16 +43,19 @@ jobs:
         run: python -m mypy src
 
       - name: Compile Python files
-        run: python -m compileall src tests scripts run_job_pipeline.py linkedin_job_scraper.py job_fit_evaluator.py job_scraper_config.py
+        run: python -m compileall src tests scripts run_job_pipeline.py phd_finder.py linkedin_job_scraper.py job_fit_evaluator.py job_scraper_config.py
 
       - name: Smoke-test CLIs
         run: |
           PYTHONPATH=src python -m jobfinder.pipeline.cli --help
           PYTHONPATH=src python -m jobfinder.scraper.cli --help
           PYTHONPATH=src python -m jobfinder.evaluator.cli --help
+          python phd_finder.py --help
 
       - name: Validate JSON config
-        run: python -m json.tool configs/filters.json
+        run: |
+          python -m json.tool configs/filters.json
+          python -m json.tool profiles/phd/filters.json
 
       - name: Test
         run: python -m pytest

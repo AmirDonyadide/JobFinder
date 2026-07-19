@@ -15,6 +15,12 @@ from jobfinder.operations.reports import write_report_from_env
 from jobfinder.paths import ENV_FILE, PROJECT_ROOT
 from jobfinder.pipeline.preflight import run_preflight
 from jobfinder.pipeline.resume import find_incomplete_evaluation_sheet
+from jobfinder.profiles import (
+    DEFAULT_PROFILE,
+    PROFILE_ENV,
+    FinderProfile,
+    resolve_profile,
+)
 from jobfinder.scraper.settings import parse_apify_api_tokens
 
 LOGGER = logging.getLogger("jobfinder.pipeline")
@@ -60,6 +66,20 @@ def resolve_pipeline_mode(args: argparse.Namespace, local_env: dict[str, str]) -
     """Resolve the selected mode from CLI args, env, or the default."""
     mode_value = args.mode or setting(local_env, "JOBFINDER_PIPELINE_MODE")
     return parse_pipeline_mode(mode_value)
+
+
+def resolve_pipeline_profile(
+    args: argparse.Namespace,
+    local_env: dict[str, str],
+    *,
+    default_profile: str = DEFAULT_PROFILE,
+) -> FinderProfile:
+    """Resolve the selected product profile from CLI, env, or entry point."""
+    profile_value = args.profile or setting(local_env, PROFILE_ENV) or default_profile
+    try:
+        return resolve_profile(profile_value)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 def validate_required_settings(local_env: dict[str, str], pipeline_mode: str) -> None:
@@ -162,6 +182,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument(
+        "--profile",
+        choices=("jobs", "phd"),
+        help=(
+            "Use the standard JobFinder profile or the academic PhDFinder profile. "
+            "Defaults to JOBFINDER_PROFILE or the command's product default."
+        ),
+    )
+    parser.add_argument(
         "--mode",
         help=(
             "Use 'scrape_only' to stop after scraping, or "
@@ -186,11 +214,16 @@ def child_pythonpath() -> str:
     return src_path
 
 
-def main() -> int:
+def main(*, default_profile: str = DEFAULT_PROFILE) -> int:
     """Run the scraper pipeline in the selected mode."""
     configure_cli_logging()
     args = build_arg_parser().parse_args()
     local_env = load_local_env()
+    profile = resolve_pipeline_profile(
+        args,
+        local_env,
+        default_profile=default_profile,
+    )
     pipeline_mode = resolve_pipeline_mode(args, local_env)
     step_timeout_seconds = parse_step_timeout_seconds(local_env)
     validate_required_settings(local_env, pipeline_mode)
@@ -201,6 +234,7 @@ def main() -> int:
             result = run_preflight(
                 env=EnvSettings(local_env),
                 should_evaluate=pipeline_mode == PIPELINE_MODE_SCRAPE_AND_EVALUATE,
+                profile=profile,
             )
         except Exception as exc:
             LOGGER.error("Preflight failed: %s", exc)
@@ -219,7 +253,8 @@ def main() -> int:
                 result,
             )
             LOGGER.info(
-                "Preflight complete. sources=%s, output=%s, keywords=%s",
+                "Preflight complete. profile=%s, sources=%s, output=%s, keywords=%s",
+                result.profile,
                 result.source_mode,
                 result.output_mode,
                 result.keyword_count,
@@ -233,6 +268,8 @@ def main() -> int:
     env["JOBFINDER_SCRAPER_OUTPUT_MODE"] = "google_sheets"
     env["JOBSCRAPER_OUTPUT_MODE"] = "google_sheets"
     env["JOBFINDER_PIPELINE_MODE"] = pipeline_mode
+    env[PROFILE_ENV] = profile.key
+    LOGGER.info("Finder profile: %s (%s).", profile.key, profile.display_name)
 
     scrape_command = [sys.executable, "-m", "jobfinder.scraper.cli"]
 
@@ -254,7 +291,8 @@ def main() -> int:
     ):
         try:
             resume_sheet = find_incomplete_evaluation_sheet(
-                EnvSettings(local_env, logger=LOGGER)
+                EnvSettings(local_env, logger=LOGGER),
+                profile=profile,
             )
         except Exception as exc:
             LOGGER.warning(
@@ -311,6 +349,11 @@ def main() -> int:
         "Pipeline complete. Your Google Sheet now includes the AI evaluation columns."
     )
     return 0
+
+
+def phd_main() -> int:
+    """Run the shared pipeline with PhDFinder as the default profile."""
+    return main(default_profile="phd")
 
 
 if __name__ == "__main__":

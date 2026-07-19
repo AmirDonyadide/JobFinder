@@ -44,6 +44,11 @@ def build_arg_parser(env: EnvSettings | None = None) -> argparse.ArgumentParser:
         description="Evaluate job postings with OpenAI and update the same sheet."
     )
     parser.add_argument(
+        "--profile",
+        choices=("jobs", "phd"),
+        help="Use the standard JobFinder profile or the academic PhDFinder profile.",
+    )
+    parser.add_argument(
         "--source",
         choices=sorted(SOURCE_ALIASES),
         default=None,
@@ -95,6 +100,7 @@ def main() -> int:
             sheet=args.sheet,
             google_sheet_id_arg=args.google_sheet_id,
             pdf_only=args.pdf_only,
+            profile=args.profile,
         )
         summary = run_evaluation(options)
         write_report_from_env(

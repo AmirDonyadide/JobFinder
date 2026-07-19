@@ -228,6 +228,7 @@ __marimo__/
 # Generated scraper output
 jobs.xlsx
 jobs_*.xlsx
+phd_jobs.xlsx
 ~$*.xlsx
 
 # Local Google credentials and tokens
@@ -250,3 +251,10 @@ prompts/master_prompt.txt
 
 # Private search inputs
 configs/keywords.txt
+
+# Private PhDFinder profile inputs and state
+profiles/phd/keywords.txt
+profiles/phd/master_prompt.txt
+profiles/phd/master_cv.tex
+profiles/phd/photo.png
+profiles/phd/google_spreadsheet_id.txt

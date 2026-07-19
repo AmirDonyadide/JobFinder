@@ -23,6 +23,7 @@ dependencies = [
 jobfinder-scrape = "jobfinder.scraper.cli:main"
 jobfinder-evaluate = "jobfinder.evaluator.cli:main"
 jobfinder-pipeline = "jobfinder.pipeline.cli:main"
+phdfinder = "jobfinder.pipeline.cli:phd_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -12,7 +12,8 @@ JobFinder reads settings from three places, in priority order:
 
 1. **Real environment variables** (including values you set inline on the command line).
 2. **`.env`** in the project root (for local runs).
-3. **Config files** in `configs/` (`filters.json` and `keywords.txt`) for non-secret defaults.
+3. **Profile config files**: `configs/` for JobFinder or `profiles/phd/` for
+   PhDFinder.
 
 Real environment variables always win over `.env`. Legacy `JOBSCRAPER_*` names
 are still accepted as aliases for the newer `JOBFINDER_SCRAPER_*` names.
@@ -37,7 +38,11 @@ are still accepted as aliases for the newer `JOBFINDER_SCRAPER_*` names.
 | `APIFY_API_TOKEN` | blank | One Apify token, or 1–12 semicolon-separated tokens for ordered fallback. |
 | `OPENAI_API_KEY` | blank | Required for evaluator and full-pipeline runs. |
 | `GOOGLE_SPREADSHEET_ID` | blank | Google Sheet ID. Also read from `google_spreadsheet_id.txt` when absent. |
+| `JOBFINDER_PROFILE` | `jobs` | `jobs` for the existing product or `phd` for the isolated PhDFinder profile. CLI `--profile` takes precedence. |
+| `PHDFINDER_GOOGLE_SPREADSHEET_ID` | blank | Optional local PhDFinder spreadsheet ID. PhDFinder deliberately does not reuse JobFinder's `GOOGLE_SPREADSHEET_ID`; it otherwise uses `profiles/phd/google_spreadsheet_id.txt`. |
+| `PHDFINDER_CV_DRIVE_FOLDER_ID` | blank | PhDFinder-only Drive folder for generated academic CV PDFs. |
 | `JOBFINDER_SCRAPER_OUTPUT_MODE` | `excel` | `excel`, `google_sheets`, or `both`. The full pipeline forces `google_sheets`. |
+| `JOBFINDER_SCRAPER_EXCEL_FILE` | profile default | Optional local workbook override. Defaults to `jobs.xlsx` or `phd_jobs.xlsx`. |
 | `JOBFINDER_SCRAPER_SOURCES` | `linkedin` | `linkedin`, `indeed`, `stepstone`, `xing`, `all`, or a comma-separated list. |
 | `JOBFINDER_PIPELINE_MODE` | `scrape_and_evaluate` | Used by the pipeline when `--mode` is omitted. |
 | `JOBFINDER_PIPELINE_RESUME_INCOMPLETE` | `true` | In full-pipeline mode, resume an incomplete same-day tab instead of scraping again. |

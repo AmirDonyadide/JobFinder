@@ -1,0 +1,56 @@
+{
+  "linkedin_search": {
+    "location": "Germany",
+    "geo_id": "101282230",
+    "published_at": "r604800",
+    "experience_levels": [
+      "1",
+      "2"
+    ],
+    "contract_types": [
+      "F",
+      "P",
+      "I"
+    ],
+    "split_country": "DE"
+  },
+  "stepstone_search": {
+    "location": "Germany",
+    "category": "",
+    "start_urls": []
+  },
+  "xing_search": {
+    "location": "Germany",
+    "date_posted": "",
+    "start_url": "",
+    "max_pages": 20
+  },
+  "final_filters": {
+    "excluded_title_terms": [
+      "Postdoctoral",
+      "Postdoc",
+      "Professor",
+      "Professorship",
+      "Research Director",
+      "Head of Research",
+      "Working Student",
+      "Werkstudent",
+      "Internship",
+      "Praktikum",
+      "Bachelor Thesis",
+      "Master Thesis",
+      "Masterarbeit"
+    ],
+    "excluded_company_terms": [],
+    "max_applicants": 0
+  },
+  "spreadsheet": {
+    "application_status_options": [
+      "applied",
+      "rejected",
+      "interview",
+      "accepted"
+    ]
+  }
+}
+

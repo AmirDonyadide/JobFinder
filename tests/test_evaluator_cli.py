@@ -6,6 +6,7 @@ from jobfinder.env import EnvSettings
 from jobfinder.evaluator.cli import build_arg_parser, parse_source
 from jobfinder.evaluator.models import EvaluationError
 from jobfinder.evaluator.service import (
+    options_from_env,
     parse_unsuitable_row_policy,
     resolve_cv_photo_file,
     should_remove_rejected_rows,
@@ -46,6 +47,42 @@ def test_arg_parser_accepts_pdf_only_recovery_mode():
     args = parser.parse_args(["--pdf-only"])
 
     assert args.pdf_only is True
+
+
+def test_evaluator_uses_phdfinder_asset_defaults():
+    env = EnvSettings({"JOB_EVAL_CV_PDF_OUTPUT": "false"})
+
+    options = options_from_env(
+        env,
+        source_arg="excel",
+        sheet="latest",
+        google_sheet_id_arg="",
+        profile="phd",
+    )
+
+    assert options.profile.key == "phd"
+    assert options.excel_file.name == "phd_jobs.xlsx"
+    assert options.master_prompt_file.parent.name == "phd"
+    assert options.cv_file.parent.name == "phd"
+    assert options.cv_photo_file.parent.name == "phd"
+
+
+def test_phdfinder_requires_its_own_cv_drive_folder(monkeypatch):
+    monkeypatch.setenv("JOB_EVAL_CV_DRIVE_FOLDER_ID", "jobfinder-folder")
+    monkeypatch.delenv("PHDFINDER_CV_DRIVE_FOLDER_ID", raising=False)
+
+    try:
+        options_from_env(
+            EnvSettings({}),
+            source_arg="excel",
+            sheet="latest",
+            google_sheet_id_arg="",
+            profile="phd",
+        )
+    except EvaluationError as exc:
+        assert "PHDFINDER_CV_DRIVE_FOLDER_ID" in str(exc)
+    else:
+        raise AssertionError("Expected PhDFinder to require a separate Drive folder.")
 
 
 def test_parse_unsuitable_row_policy_controls_final_filtering():

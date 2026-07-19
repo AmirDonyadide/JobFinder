@@ -14,6 +14,7 @@ from jobfinder.pipeline.cli import (
     parse_pipeline_mode,
     parse_step_timeout_seconds,
     resolve_pipeline_mode,
+    resolve_pipeline_profile,
     validate_required_settings,
 )
 from jobfinder.pipeline.resume import IncompleteEvaluationSheet
@@ -39,6 +40,22 @@ def test_resolve_pipeline_mode_prefers_cli_over_env():
     )
 
     assert mode == PIPELINE_MODE_SCRAPE_ONLY
+
+
+def test_resolve_pipeline_profile_prefers_cli_and_supports_phd_default():
+    explicit = resolve_pipeline_profile(
+        argparse.Namespace(profile="jobs"),
+        {"JOBFINDER_PROFILE": "phd"},
+        default_profile="phd",
+    )
+    defaulted = resolve_pipeline_profile(
+        argparse.Namespace(profile=None),
+        {},
+        default_profile="phd",
+    )
+
+    assert explicit.key == "jobs"
+    assert defaulted.key == "phd"
 
 
 def test_parse_step_timeout_accepts_disabled_and_default_values():
@@ -122,7 +139,7 @@ def test_main_resumes_incomplete_evaluation_without_scraping(monkeypatch):
     monkeypatch.setattr(
         pipeline_cli,
         "find_incomplete_evaluation_sheet",
-        lambda env: IncompleteEvaluationSheet(
+        lambda env, *, profile=None: IncompleteEvaluationSheet(
             spreadsheet_id="spreadsheet-id",
             sheet_name="2026-06-04 07-17-00",
             queued_count=3,
