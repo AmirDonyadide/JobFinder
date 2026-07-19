@@ -8,7 +8,10 @@ from dataclasses import replace
 import pytest
 
 from jobfinder.env import EnvSettings
-from jobfinder.evaluator.cv_contract import validate_master_cv_structure
+from jobfinder.evaluator.cv_contract import (
+    cv_contract_for_product,
+    validate_master_cv_structure,
+)
 from jobfinder.evaluator.storage import read_google_spreadsheet_id
 from jobfinder.products import (
     FinderProductError,
@@ -44,6 +47,7 @@ def test_phdfinder_aliases_resolve_to_isolated_product_paths():
     assert product.filters_file.name == "filters.json"
     assert product.excel_output_file.name == "phd_jobs.xlsx"
     assert product.spreadsheet_id_file.parent.name == "phdfinder"
+    assert product.cv_language == "English"
 
 
 def test_product_from_env_uses_explicit_override_before_environment(monkeypatch):
@@ -105,4 +109,17 @@ def test_phdfinder_example_assets_satisfy_preflight_contracts():
     )
 
     assert re.search(r"\b20[\s-]*point", prompt, re.IGNORECASE)
-    validate_master_cv_structure(master_cv)
+    assert "complete tailored English LaTeX CV" in prompt
+    assert "Write the complete response in professional English" in prompt
+    assert not re.search(
+        r"\b(?:German|Ausbildung|Berufserfahrung|Projekte|Sprachen)\b",
+        prompt,
+    )
+    assert not re.search(
+        r"\b(?:Profil|Ausbildung|Berufserfahrung|Projekte|Sprachen)\b",
+        master_cv,
+    )
+    validate_master_cv_structure(
+        master_cv,
+        contract=cv_contract_for_product(product),
+    )

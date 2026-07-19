@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from jobfinder.evaluator.cv_contract import ENGLISH_CV_CONTRACT
 from jobfinder.evaluator.models import OUTPUT_COLUMNS
 from jobfinder.evaluator.parsing import (
+    build_cv_contract_retry_prompt,
+    build_missing_cv_retry_prompt,
     enforce_protected_cv_sections,
     ensure_output_columns,
     extract_job_records,
@@ -249,6 +252,30 @@ Tailored experience
     assert protected_cv.index(r"\section*{Ausbildung}") < protected_cv.index(
         r"\section*{Berufserfahrung}"
     )
+
+
+def test_phdfinder_repair_prompts_require_an_english_cv():
+    missing_cv_prompt = build_missing_cv_retry_prompt(
+        "Academic evaluator",
+        "Doctoral researcher advertisement",
+        r"\documentclass{article}",
+        "Verdict: Suitable",
+        contract=ENGLISH_CV_CONTRACT,
+    )
+    contract_prompt = build_cv_contract_retry_prompt(
+        "Academic evaluator",
+        "Doctoral researcher advertisement",
+        r"\documentclass{article}",
+        "Verdict: Suitable",
+        "Missing Education",
+        contract=ENGLISH_CV_CONTRACT,
+    )
+
+    assert "full tailored English LaTeX CV" in missing_cv_prompt
+    assert "complete English LaTeX CV" in contract_prompt
+    assert "complete Education section" in contract_prompt
+    assert "complete Languages section" in contract_prompt
+    assert "German LaTeX CV" not in missing_cv_prompt + contract_prompt
 
 
 def test_columns_to_remove_after_evaluation_targets_details_and_old_ai_columns():

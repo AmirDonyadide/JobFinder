@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from jobfinder.evaluator.cv_contract import ENGLISH_CV_CONTRACT
 from jobfinder.evaluator.models import JobEvaluation, JobRecord
 from jobfinder.evaluator.openai_client import (
     OpenAIJobEvaluator,
@@ -39,6 +42,30 @@ def make_records(count: int) -> list[JobRecord]:
         )
         for idx in range(count)
     ]
+
+
+def test_phdfinder_initial_openai_request_requires_professional_english():
+    evaluator = OpenAIJobEvaluator.__new__(OpenAIJobEvaluator)
+    evaluator.model = "test-model"
+    evaluator.retries = 0
+    evaluator.base_delay = 0
+    evaluator.max_delay = 0
+    evaluator.max_output_tokens = 1000
+    evaluator.cv_contract = ENGLISH_CV_CONTRACT
+    captured: dict[str, str] = {}
+
+    def create_response(**kwargs: str) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(output_text="Verdict: Not Suitable")
+
+    evaluator.client = SimpleNamespace(
+        responses=SimpleNamespace(create=create_response)
+    )
+
+    evaluator.call_openai("Prompt", make_records(1)[0])
+
+    assert "written in professional English" in captured["instructions"]
+    assert "official original form" in captured["instructions"]
 
 
 def test_evaluate_records_calls_save_callback_for_each_result():

@@ -9,10 +9,13 @@ import unicodedata
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 from jobfinder.evaluator.cv_contract import (
+    GERMAN_CV_CONTRACT,
+    CvContract,
     remove_least_relevant_experience,
     remove_least_relevant_project,
 )
@@ -232,11 +235,23 @@ def generate_cv_pdf_outputs(
     compile_latex: CompileLatexFunc = compile_latex_to_pdf,
     upload_pdf: UploadPdfFunc = upload_pdf_to_drive,
     max_page_limit: int = DEFAULT_CV_MAX_PAGES,
+    cv_contract: CvContract = GERMAN_CV_CONTRACT,
     remove_project: TransformLatexFunc = remove_least_relevant_project,
     remove_experience: TransformLatexFunc = remove_least_relevant_experience,
     on_output: OutputCallback | None = None,
 ) -> CvPdfRunResult:
     """Compile CVs and apply the fixed project-then-experience overflow policy."""
+    if remove_project is remove_least_relevant_project:
+        remove_project = partial(
+            remove_least_relevant_project,
+            contract=cv_contract,
+        )
+    if remove_experience is remove_least_relevant_experience:
+        remove_experience = partial(
+            remove_least_relevant_experience,
+            contract=cv_contract,
+        )
+
     candidates = assign_cv_ids(
         records,
         evaluations,

@@ -212,10 +212,12 @@ repairs only the exact rejected source line (`&` to `\&`) and retries once.
 This fixes common AI text escaping mistakes without changing legitimate table
 or alignment separators elsewhere in the document.
 
-Before compilation, the evaluator restores locked header data, Ausbildung
-(except validated course selections), and languages from the Master CV. Project
-titles select an exact 3–4 project subset; the project blocks themselves are
-always copied from the Master CV. Experience companies and dates are validated.
+Before compilation, the evaluator applies the selected product's language-aware
+CV contract. JobFinder keeps its German section vocabulary; PhDFinder requires
+an English CV and restores `Education` (except validated course selections) and
+`Languages` from its English Master CV. Project titles select an exact 3–4
+project subset; the project blocks themselves are always copied from the Master
+CV. Experience organizations and dates are validated.
 
 The PDF page policy is fixed: compile first; if the result exceeds two pages,
 remove the last relevance-ranked project and recompile; if it still exceeds two

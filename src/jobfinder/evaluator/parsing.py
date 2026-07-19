@@ -8,7 +8,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from jobfinder.evaluator.cv_contract import enforce_master_cv_contract
+from jobfinder.evaluator.cv_contract import (
+    GERMAN_CV_CONTRACT,
+    CvContract,
+    enforce_master_cv_contract,
+)
 from jobfinder.evaluator.models import (
     AI_OUTPUT_COLUMNS,
     OUTPUT_COLUMNS,
@@ -288,6 +292,8 @@ def build_missing_cv_retry_prompt(
     job_advertisement: str,
     latex_cv: str,
     previous_response_text: str,
+    *,
+    contract: CvContract = GERMAN_CV_CONTRACT,
 ) -> str:
     """Compose a focused repair prompt when a suitable job omitted the CV."""
     return "\n\n".join(
@@ -299,7 +305,8 @@ def build_missing_cv_retry_prompt(
             "The previous response marked this job as Suitable but did not include "
             "a usable customized LaTeX CV. Do not skip CV generation. Do not "
             "change the Suitable verdict. Generate the missing full tailored "
-            "German LaTeX CV now, using only the Master LaTeX CV as evidence.\n\n"
+            f"{contract.language} LaTeX CV now, using only the Master LaTeX CV "
+            "as evidence.\n\n"
             "Return the first three machine-readable lines, then include:\n\n"
             "Customized CV (LaTeX):\n"
             "```latex\n"
@@ -331,6 +338,8 @@ def build_cv_contract_retry_prompt(
     latex_cv: str,
     previous_response_text: str,
     contract_error: str,
+    *,
+    contract: CvContract = GERMAN_CV_CONTRACT,
 ) -> str:
     """Compose one repair request for a structurally invalid tailored CV."""
     return "\n\n".join(
@@ -341,10 +350,13 @@ def build_cv_contract_retry_prompt(
             "%==================================================\n\n"
             "The previous Suitable response violated a machine-checked Master CV "
             "rule. Keep the fit evaluation unchanged and regenerate the complete "
-            "German LaTeX CV from the Master CV. Projects must be an exact 3-4 "
+            f"{contract.language} LaTeX CV from the Master CV. Projects must be "
+            "an exact 3-4 "
             "project subset copied without any wording changes. Preserve all "
-            "experience companies and dates, locked header data, Ausbildung, and "
-            "languages. Use only supported courses from the Master CV evidence "
+            "experience companies and dates, locked header data, the complete "
+            f"{contract.education_section} section, and the complete "
+            f"{contract.languages_section} section. Use only supported courses "
+            "from the Master CV evidence "
             f"pools. Contract error: {contract_error}\n\n"
             "Return the first three machine-readable lines followed by the complete "
             "Customized CV (LaTeX) code block.",
@@ -395,9 +407,15 @@ def extract_latex_cv_from_response(response_text: str) -> str:
 def enforce_protected_cv_sections(
     generated_latex: str,
     master_latex: str,
+    *,
+    contract: CvContract = GERMAN_CV_CONTRACT,
 ) -> str:
     """Enforce all locked and source-derived Master CV structures."""
-    return enforce_master_cv_contract(generated_latex, master_latex)
+    return enforce_master_cv_contract(
+        generated_latex,
+        master_latex,
+        contract=contract,
+    )
 
 
 def normalize_verdict(raw_value: str) -> str | None:

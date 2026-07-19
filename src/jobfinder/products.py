@@ -34,6 +34,7 @@ class FinderProduct:
     slug: str
     display_name: str
     spreadsheet_title: str
+    cv_language: str
     product_dir: Path
     keywords_file: Path
     filters_file: Path
@@ -55,6 +56,7 @@ PRODUCTS: dict[str, FinderProduct] = {
         slug="jobfinder",
         display_name="JobFinder",
         spreadsheet_title="jobs",
+        cv_language="German",
         product_dir=JOBFINDER_PRODUCT_DIR,
         keywords_file=KEYWORDS_FILE,
         filters_file=FILTERS_FILE,
@@ -71,6 +73,7 @@ PRODUCTS: dict[str, FinderProduct] = {
         slug="phdfinder",
         display_name="PhDFinder",
         spreadsheet_title="PhDFinder",
+        cv_language="English",
         product_dir=PHDFINDER_PRODUCT_DIR,
         keywords_file=PHDFINDER_PRODUCT_DIR / "config" / "keywords.txt",
         filters_file=PHDFINDER_PRODUCT_DIR / "config" / "filters.json",

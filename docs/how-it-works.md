@@ -111,9 +111,10 @@ ID is configured, otherwise Excel).
 6. Call the OpenAI Responses API with strict machine-readable output instructions.
 7. Parse the verdict, fit score, unsuitable reasons, and optional tailored LaTeX CV.
 8. Save each completed evaluation immediately (or in batches via `JOB_EVAL_SAVE_BATCH_SIZE`).
-9. Enforce the Master-CV contract: restore locked header/Ausbildung/languages,
-   copy selected projects exactly from the Master CV, and validate experience
-   companies and dates.
+9. Enforce the selected product's Master-CV contract: JobFinder restores its
+   German sections, while PhDFinder restores the English `Education` and
+   `Languages` sections. Both copy selected projects exactly from the Master CV
+   and validate experience organizations and dates.
 10. Compile generated CV LaTeX. If it exceeds two pages, remove one
     relevance-ranked project and recompile; if still long, remove one
     relevance-ranked experience and recompile. Never rewrite projects during

@@ -7,7 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from jobfinder.env import EnvSettings
-from jobfinder.evaluator.cv_contract import validate_master_cv_structure
+from jobfinder.evaluator.cv_contract import (
+    cv_contract_for_product,
+    validate_master_cv_structure,
+)
 from jobfinder.evaluator.parsing import read_text_asset
 from jobfinder.evaluator.storage import read_google_spreadsheet_id
 from jobfinder.integrations.google.drive import (
@@ -67,7 +70,10 @@ def run_preflight(
             raise RuntimeError(
                 "Master prompt is not the current 20-point evaluator version."
             )
-        validate_master_cv_structure(master_cv)
+        validate_master_cv_structure(
+            master_cv,
+            contract=cv_contract_for_product(finder_profile),
+        )
         if not env.get("OPENAI_API_KEY"):
             raise RuntimeError("Missing OPENAI_API_KEY.")
         if env.get_bool("JOB_EVAL_CV_PDF_OUTPUT", True) and not (
