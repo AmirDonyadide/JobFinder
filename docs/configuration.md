@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Every JobFinder setting in one place. Most people only need a handful of these —
+Settings shared by JobFinder and PhDFinder in one place. Most people only need a handful —
 start with the [Local guide](run-local.md) or [Quick Start](quick-start.md), and
 come here when you want to fine-tune a run.
 
@@ -8,12 +8,11 @@ Back to the [project overview](../README.md) · [Usage guide](usage.md).
 
 ## How settings are resolved
 
-JobFinder reads settings from three places, in priority order:
+The selected product reads settings from three places, in priority order:
 
 1. **Real environment variables** (including values you set inline on the command line).
 2. **`.env`** in the project root (for local runs).
-3. **Profile config files**: `configs/` for JobFinder or `profiles/phd/` for
-   PhDFinder.
+3. **Product files** under `products/jobfinder/` or `products/phdfinder/`.
 
 Real environment variables always win over `.env`. Legacy `JOBSCRAPER_*` names
 are still accepted as aliases for the newer `JOBFINDER_SCRAPER_*` names.
@@ -38,11 +37,12 @@ are still accepted as aliases for the newer `JOBFINDER_SCRAPER_*` names.
 | `APIFY_API_TOKEN` | blank | One Apify token, or 1–12 semicolon-separated tokens for ordered fallback. |
 | `OPENAI_API_KEY` | blank | Required for evaluator and full-pipeline runs. |
 | `GOOGLE_SPREADSHEET_ID` | blank | Google Sheet ID. Also read from `google_spreadsheet_id.txt` when absent. |
-| `JOBFINDER_PROFILE` | `jobs` | `jobs` for the existing product or `phd` for the isolated PhDFinder profile. CLI `--profile` takes precedence. |
-| `PHDFINDER_GOOGLE_SPREADSHEET_ID` | blank | Optional local PhDFinder spreadsheet ID. PhDFinder deliberately does not reuse JobFinder's `GOOGLE_SPREADSHEET_ID`; it otherwise uses `profiles/phd/google_spreadsheet_id.txt`. |
+| `JOBFINDER_PRODUCT` | command default | `jobs` selects JobFinder and `phd` selects PhDFinder. CLI `--product` takes precedence. |
+| `JOBFINDER_PROFILE` | unset | Historical alias for `JOBFINDER_PRODUCT`. |
+| `PHDFINDER_GOOGLE_SPREADSHEET_ID` | blank | Optional local PhDFinder spreadsheet ID. PhDFinder deliberately does not reuse JobFinder's `GOOGLE_SPREADSHEET_ID`; it otherwise uses `products/phdfinder/google_spreadsheet_id.txt`. |
 | `PHDFINDER_CV_DRIVE_FOLDER_ID` | blank | PhDFinder-only Drive folder for generated academic CV PDFs. |
 | `JOBFINDER_SCRAPER_OUTPUT_MODE` | `excel` | `excel`, `google_sheets`, or `both`. The full pipeline forces `google_sheets`. |
-| `JOBFINDER_SCRAPER_EXCEL_FILE` | profile default | Optional local workbook override. Defaults to `jobs.xlsx` or `phd_jobs.xlsx`. |
+| `JOBFINDER_SCRAPER_EXCEL_FILE` | product default | Optional local workbook override. Defaults to `jobs.xlsx` or `phd_jobs.xlsx`. |
 | `JOBFINDER_SCRAPER_SOURCES` | `linkedin` | `linkedin`, `indeed`, `stepstone`, `xing`, `all`, or a comma-separated list. |
 | `JOBFINDER_PIPELINE_MODE` | `scrape_and_evaluate` | Used by the pipeline when `--mode` is omitted. |
 | `JOBFINDER_PIPELINE_RESUME_INCOMPLETE` | `true` | In full-pipeline mode, resume an incomplete same-day tab instead of scraping again. |
@@ -130,8 +130,8 @@ than 30 days omit `date_posted` and rely on post-scrape filtering.
 | `JOB_EVAL_SHEET` | `latest` | Worksheet/tab to evaluate. |
 | `JOB_EVAL_GOOGLE_SPREADSHEET_ID` | blank | Evaluator-specific spreadsheet ID override. |
 | `JOB_EVAL_EXCEL_FILE` | `jobs.xlsx` | Excel workbook path. |
-| `JOB_EVAL_MASTER_PROMPT_FILE` | `prompts/master_prompt.txt` | Prompt file path. |
-| `JOB_EVAL_CV_FILE` | `cv/master_cv.tex` | CV file path. |
+| `JOB_EVAL_MASTER_PROMPT_FILE` | `products/jobfinder/evaluator/master_prompt.txt` | Prompt file path. |
+| `JOB_EVAL_CV_FILE` | `products/jobfinder/evaluator/master_cv.tex` | CV file path. |
 | `JOB_EVAL_OPENAI_MODEL` | `gpt-5-mini` | OpenAI model used for evaluation. |
 | `JOB_EVAL_BATCH_SIZE` | `40` | Queued records processed per local batch. |
 | `JOB_EVAL_CONCURRENCY` | `8` | OpenAI requests allowed in parallel per batch. |
@@ -141,7 +141,7 @@ than 30 days omit `date_posted` and rely on post-scrape filtering.
 | `JOB_EVAL_OPENAI_TIMEOUT` | `120` | OpenAI request timeout (seconds). |
 | `JOB_EVAL_MAX_OUTPUT_TOKENS` | `9000` | Max tokens per model response (minimum `500`). |
 | `JOB_EVAL_CV_PDF_OUTPUT` | `true` | Compile generated LaTeX CVs to PDFs and upload them to Drive. |
-| `JOB_EVAL_CV_PHOTO_FILE` | `cv/photo.png` | Optional photo copied into each isolated LaTeX build directory. |
+| `JOB_EVAL_CV_PHOTO_FILE` | `products/jobfinder/evaluator/photo.png` | Optional photo copied into each isolated LaTeX build directory. |
 | `JOB_EVAL_CV_PDF_TIMEOUT` | `120` | Max seconds for one LaTeX PDF compilation. |
 | `JOB_EVAL_CV_DRIVE_FOLDER_ID` | blank | Drive folder ID for timestamped PDF folders. Required when PDF output is on. |
 | `JOB_EVAL_CV_PDF_APPLICANT_NAME` | `Applicant` | Name used in upload-safe PDF filenames. |
@@ -170,10 +170,11 @@ Used mainly by GitHub Actions, but settable locally too.
 
 ## Config files
 
-Two files in `configs/` hold non-secret defaults. Full details are in
-[`configs/README.md`](../configs/README.md).
+Each product owns its private keywords and committed filters. See the
+[JobFinder config guide](../products/jobfinder/config/README.md) and
+[PhDFinder product guide](../products/phdfinder/README.md).
 
-### `configs/keywords.txt` (private — not committed)
+### `products/jobfinder/config/keywords.txt` (private — not committed)
 
 One search keyword per line. Blank lines and `#` comments are ignored. Each
 keyword is searched against every selected board (except Stepstone/Xing direct
@@ -186,7 +187,7 @@ geospatial data
 remote sensing
 ```
 
-### `configs/filters.json` (committed)
+### `products/jobfinder/config/filters.json` (committed)
 
 | Section | Keys | Used by |
 |---|---|---|

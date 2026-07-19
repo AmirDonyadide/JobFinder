@@ -40,10 +40,10 @@ from jobfinder.evaluator.storage import (
     write_excel_output,
     write_google_output,
 )
-from jobfinder.profiles import (
-    FinderProfile,
-    profile_cv_drive_folder_id,
-    profile_from_env,
+from jobfinder.products import (
+    FinderProduct,
+    product_cv_drive_folder_id,
+    product_from_env,
 )
 
 LOGGER = logging.getLogger("job_fit_evaluator")
@@ -85,7 +85,7 @@ class EvaluationOptions:
     """Resolved evaluator settings for one workflow run."""
 
     env: EnvSettings
-    profile: FinderProfile
+    profile: FinderProduct
     source_arg: str | None
     sheet: str
     google_sheet_id_arg: str
@@ -137,12 +137,12 @@ def options_from_env(
     sheet: str,
     google_sheet_id_arg: str,
     pdf_only: bool = False,
-    profile: str | FinderProfile | None = None,
+    profile: str | FinderProduct | None = None,
 ) -> EvaluationOptions:
     """Build evaluator options from CLI args plus environment settings."""
-    finder_profile = profile_from_env(env, profile)
+    finder_profile = product_from_env(env, profile)
     cv_pdf_output = env.get_bool("JOB_EVAL_CV_PDF_OUTPUT", True)
-    cv_drive_folder_id = profile_cv_drive_folder_id(env, finder_profile)
+    cv_drive_folder_id = product_cv_drive_folder_id(env, finder_profile)
     if not cv_drive_folder_id:
         cv_drive_folder_id = DEFAULT_DRIVE_PARENT_FOLDER_ID
     if cv_pdf_output and not cv_drive_folder_id.strip():

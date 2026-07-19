@@ -10,7 +10,7 @@ Back to the [project overview](../README.md).
 
 | Symptom | Likely cause | What to do |
 |---|---|---|
-| `No module named 'jobfinder'` | Package not installed and `PYTHONPATH` not set. | Run `python -m pip install -e .`, use the root scripts, or prefix commands with `env PYTHONPATH=src`. |
+| `No module named 'jobfinder'` | Package not installed and `PYTHONPATH` not set. | Run `python -m pip install -e ".[all]"`, use the root scripts, or prefix commands with `env PYTHONPATH=src`. |
 | `python: command not found` after `conda activate` | Environment isn't using the conda Python. | Recreate the environment, then check `which python` and `python --version`. |
 | Console script missing | Package not reinstalled after a `pyproject.toml` change. | Reinstall the editable package. |
 
@@ -31,7 +31,7 @@ Back to the [project overview](../README.md).
 | Symptom | Likely cause | What to do |
 |---|---|---|
 | Apify 502 / 503 / 504 or timeout | Actor/API instability or too much concurrency. | Lower search concurrency, lower per-search limits, or increase `APIFY_RUN_TIMEOUT_SECONDS`. |
-| Actor succeeds with zero jobs | Search mismatch, actor schema drift, or an overly narrow date/location filter. | Run the matching `python scripts/test_*_scraper.py` command to inspect raw rows before pipeline filters; enable debug logging for the first three redacted actor rows. |
+| Actor succeeds with zero jobs | Search mismatch, actor schema drift, or an overly narrow date/location filter. | Run the matching `python scripts/smoke_*.py` command to inspect raw rows before pipeline filters; enable debug logging for the first three redacted actor rows. |
 | No jobs found | Search/filter window too narrow or a provider config mismatch. | Check keywords, source selection, posted-time window, Stepstone/Xing location or start URLs, and final filters. |
 | Scraper writes Excel but the pipeline fails | The full pipeline forces Google Sheets. | Complete Google Sheets setup, or use the scraper alone for Excel. |
 
@@ -47,7 +47,7 @@ Back to the [project overview](../README.md).
 
 ## Still stuck?
 
-- Run `python run_job_pipeline.py --preflight` to validate settings and access
+- Run `jobfinder --preflight` to validate settings and access
   without spending API credits.
 - Review the relevant [Configuration reference](configuration.md) entry to make
   sure a setting does what you expect.

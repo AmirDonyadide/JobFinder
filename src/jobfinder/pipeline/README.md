@@ -6,7 +6,7 @@ Google Sheets, then optionally evaluate the newly created latest tab.
 The CLI entry point is:
 
 ```bash
-python run_job_pipeline.py
+jobfinder
 ```
 
 or, after editable install:
@@ -18,8 +18,7 @@ jobfinder-pipeline
 ## Prerequisites
 
 - Python 3.14 or newer.
-- Dependencies installed with `python -m pip install -e .` or
-  `python -m pip install -r requirements.txt`.
+- Dependencies installed with `python -m pip install -e ".[all]"`.
 - `APIFY_API_TOKEN` for all pipeline modes.
 - Google Sheets OAuth and spreadsheet access, because the pipeline forces
   Google Sheets output.
@@ -29,14 +28,14 @@ jobfinder-pipeline
 ## Quick Start
 
 ```bash
-python run_job_pipeline.py --mode scrape_only --preflight
-python run_job_pipeline.py --mode scrape_only
+jobfinder --mode scrape_only --preflight
+jobfinder --mode scrape_only
 ```
 
 Full scrape plus evaluation:
 
 ```bash
-python run_job_pipeline.py --mode scrape_and_evaluate
+jobfinder --mode scrape_and_evaluate
 ```
 
 ## Files
@@ -61,7 +60,7 @@ resolved in `parse_pipeline_mode()`.
 
 ```mermaid
 flowchart TD
-    A["run_job_pipeline.py"] --> B["pipeline/cli.py"]
+    A["jobfinder / phdfinder"] --> B["pipeline/cli.py"]
     B --> C["load .env fallback"]
     C --> D["validate APIFY_API_TOKEN<br/>and OPENAI_API_KEY when needed"]
     D --> E{"--preflight?"}
@@ -86,7 +85,7 @@ Child commands are run with:
 
 ## Preflight
 
-`python run_job_pipeline.py --preflight` validates:
+`jobfinder --preflight` validates:
 
 - Scraper settings and keyword/filter files.
 - Apify token presence and token-count limit before settings load.
@@ -124,7 +123,7 @@ always start with scraping.
 
 ## Constraints
 
-- The pipeline is Google Sheets oriented. Use `linkedin_job_scraper.py` directly
+- The pipeline is Google Sheets oriented. Use `jobfinder-scrape` directly
   for local Excel-only scraping.
 - Resume detection only considers timestamped run tabs from the current local
   day.
@@ -141,7 +140,7 @@ inputs before changing `pipeline/cli.py`:
 | Scrape without evaluation | `--mode scrape_only` or `JOBFINDER_PIPELINE_MODE=scrape_only`. |
 | Resume or force fresh same-day runs | `JOBFINDER_PIPELINE_RESUME_INCOMPLETE`. |
 | Child process timeout | `JOBFINDER_PIPELINE_STEP_TIMEOUT_SECONDS`. |
-| Search sources and filters | Scraper env vars and `configs/filters.json`. |
+| Search sources and filters | Scraper env vars and `products/jobfinder/config/filters.json`. |
 | Evaluation model, concurrency, and cleanup policy | `JOB_EVAL_*` env vars. |
 
 Use the scraper CLI directly when a fork only needs local Excel output.

@@ -111,7 +111,7 @@ def build_authorized_http(creds: Any, *, error_cls: type[RuntimeError]) -> Any:
     except ImportError as exc:
         raise error_cls(
             "Missing Google HTTP transport packages. Install dependencies with: "
-            "python -m pip install -r requirements.txt"
+            'python -m pip install -e ".[google]"'
         ) from exc
 
     return google_auth_httplib2.AuthorizedHttp(
@@ -197,7 +197,7 @@ def run_google_oauth_flow(
     except ImportError as exc:
         raise error_cls(
             "Missing Google OAuth browser-flow support. Install dependencies with: "
-            "python -m pip install -r requirements.txt"
+            'python -m pip install -e ".[google]"'
         ) from exc
 
     try:
@@ -241,7 +241,7 @@ def load_google_oauth_credentials(
     except ImportError as exc:
         raise error_cls(
             "Missing Google API packages. Install dependencies with: "
-            "python -m pip install -r requirements.txt"
+            'python -m pip install -e ".[google]"'
         ) from exc
 
     if token_path.exists():
@@ -310,7 +310,7 @@ def build_google_api_service(
     except ImportError as exc:
         raise error_cls(
             "Missing Google API packages. Install dependencies with: "
-            "python -m pip install -r requirements.txt"
+            'python -m pip install -e ".[google]"'
         ) from exc
 
     creds = load_google_oauth_credentials(

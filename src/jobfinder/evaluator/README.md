@@ -7,7 +7,7 @@ cleans the output.
 The CLI entry point is:
 
 ```bash
-python job_fit_evaluator.py
+jobfinder-evaluate
 ```
 
 or, after editable install:
@@ -38,7 +38,7 @@ jobfinder-evaluate
 
 - Python 3.14 or newer.
 - `OPENAI_API_KEY`.
-- `prompts/master_prompt.txt` and `cv/master_cv.tex`.
+- `products/jobfinder/evaluator/master_prompt.txt` and `products/jobfinder/evaluator/master_cv.tex`.
 - An input Excel workbook or Google Sheet tab with scraper-style headers.
 - `latexmk`, `xelatex`, Google OAuth, and `JOB_EVAL_CV_DRIVE_FOLDER_ID` when
   `JOB_EVAL_CV_PDF_OUTPUT=true`.
@@ -48,19 +48,19 @@ jobfinder-evaluate
 Evaluate the latest Google Sheet tab:
 
 ```bash
-python job_fit_evaluator.py --source google_sheets --sheet latest
+jobfinder-evaluate --source google_sheets --sheet latest
 ```
 
 Evaluate the latest local Excel worksheet:
 
 ```bash
-python job_fit_evaluator.py --source excel --sheet latest
+jobfinder-evaluate --source excel --sheet latest
 ```
 
 Keep all rejected rows for prompt debugging:
 
 ```bash
-JOB_EVAL_UNSUITABLE_ROW_POLICY=keep_all python job_fit_evaluator.py --source google_sheets --sheet latest
+JOB_EVAL_UNSUITABLE_ROW_POLICY=keep_all jobfinder-evaluate --source google_sheets --sheet latest
 ```
 
 ## Use This For Your Own Project
@@ -70,8 +70,8 @@ variables:
 
 | Need | Change |
 |---|---|
-| Job-fit rubric and output expectations | `prompts/master_prompt.txt` or `MASTER_PROMPT_TEXT` in GitHub Actions. |
-| Candidate background | `cv/master_cv.tex` or `MASTER_CV_TEX` in GitHub Actions. |
+| Job-fit rubric and output expectations | `products/jobfinder/evaluator/master_prompt.txt` or `MASTER_PROMPT_TEXT` in GitHub Actions. |
+| Candidate background | `products/jobfinder/evaluator/master_cv.tex` or `MASTER_CV_TEX` in GitHub Actions. |
 | Model choice and pacing | `JOB_EVAL_OPENAI_MODEL`, `JOB_EVAL_CONCURRENCY`, `JOB_EVAL_BATCH_SIZE`, and large-queue settings. |
 | PDF upload destination | `JOB_EVAL_CV_DRIVE_FOLDER_ID`. |
 | Generated PDF filenames | `JOB_EVAL_CV_PDF_APPLICANT_NAME`. |
@@ -141,9 +141,9 @@ For each queued row:
    status, applicant counts, job/apply URLs, and existing AI output.
 2. Remaining useful cells become `Header: value` lines.
 3. The final prompt joins:
-   - `prompts/master_prompt.txt`
+   - `products/jobfinder/evaluator/master_prompt.txt`
    - the job advertisement text
-   - `cv/master_cv.tex` inside a LaTeX code block
+   - `products/jobfinder/evaluator/master_cv.tex` inside a LaTeX code block
 
 `openai_client.py` also supplies strict machine-readable instructions requiring
 the first lines:
@@ -203,7 +203,7 @@ ASCII letters, numbers, and underscores so applicant websites are less likely
 to reject the upload.
 
 Each CV is compiled in its own temporary directory with `latexmk -xelatex`.
-`JOB_EVAL_CV_PHOTO_FILE` defaults to `cv/photo.png`; when present, it is copied
+`JOB_EVAL_CV_PHOTO_FILE` defaults to `products/jobfinder/evaluator/photo.png`; when present, it is copied
 into the temp directory before compilation. Compilation errors are written to
 `AI CV PDF` for that row and do not stop the evaluator.
 
@@ -230,7 +230,7 @@ Successful PDFs are uploaded to a new timestamped folder named
 To recover PDFs without making any OpenAI request, run:
 
 ```bash
-python job_fit_evaluator.py --source google_sheets --sheet "TAB NAME" --pdf-only
+jobfinder-evaluate --source google_sheets --sheet "TAB NAME" --pdf-only
 ```
 
 PDF-only mode writes only `AI CV PDF`; it does not alter stored verdicts,
@@ -276,7 +276,7 @@ Large queue pacing activates only when queued rows exceed
 Run:
 
 ```bash
-python -m pytest tests/test_evaluator_parsing.py tests/test_evaluator_storage.py tests/test_evaluator_openai_client.py tests/test_evaluator_cli.py
+python -m pytest tests/evaluator/test_parsing.py tests/evaluator/test_storage.py tests/evaluator/test_openai_client.py tests/evaluator/test_cli.py
 ```
 
 ## Troubleshooting

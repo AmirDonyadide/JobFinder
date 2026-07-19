@@ -1,6 +1,6 @@
 # PhDFinder
 
-PhDFinder is an academic-role profile built on the JobFinder engine. It searches
+PhDFinder is an academic-role product built on the shared finder engine. It searches
 for PhD, doctoral researcher, research assistant, and related roles while
 keeping its inputs and output state independent from the normal job search.
 
@@ -23,22 +23,22 @@ PhDFinder has separate:
 Install the project and create the private PhDFinder files:
 
 ```bash
-python -m pip install -e .
-cp profiles/phd/keywords.example.txt profiles/phd/keywords.txt
-cp profiles/phd/master_prompt.example.txt profiles/phd/master_prompt.txt
-cp profiles/phd/master_cv.example.tex profiles/phd/master_cv.tex
+python -m pip install -e ".[all]"
+cp products/phdfinder/config/keywords.example.txt products/phdfinder/config/keywords.txt
+cp products/phdfinder/evaluator/master_prompt.example.txt products/phdfinder/evaluator/master_prompt.txt
+cp products/phdfinder/evaluator/master_cv.example.tex products/phdfinder/evaluator/master_cv.tex
 ```
 
-Review `profiles/phd/filters.json`, then run preflight:
+Review `products/phdfinder/config/filters.json`, then run preflight:
 
 ```bash
 phdfinder --preflight
 ```
 
-Without an editable install, use the root wrapper:
+Without an editable install, use direct module execution with `PYTHONPATH=src`:
 
 ```bash
-python phd_finder.py --preflight
+PYTHONPATH=src python -m jobfinder.pipeline.cli --product phd --preflight
 ```
 
 Run scraping only or the complete pipeline:
@@ -51,11 +51,11 @@ phdfinder --mode scrape_and_evaluate
 The equivalent generic command is:
 
 ```bash
-python run_job_pipeline.py --profile phd --mode scrape_and_evaluate
+jobfinder --product phd --mode scrape_and_evaluate
 ```
 
-The existing JobFinder commands remain unchanged and default to `--profile
-jobs`.
+The older `--profile phd` form remains accepted; `phdfinder` is the clearer
+product command.
 
 ## GitHub Actions setup
 
@@ -73,15 +73,14 @@ environment:
 - `CV_PHOTO_BASE64` when a photo is needed
 
 Run **PhDFinder Pipeline** manually from GitHub Actions. The workflow is
-manual-only by design so adding this profile cannot unexpectedly create paid
+manual-only by design so adding this product cannot unexpectedly create paid
 Apify or OpenAI usage. Enable a schedule in `.github/workflows/phd.yml` only
 after a manual run has been checked.
 
 ## Extending academic coverage
 
-The initial profile searches the four existing providers. Academic-specific
+The initial product searches the four existing providers. Academic-specific
 sources such as EURAXESS, Academic Positions, or university vacancy pages should
 be added as provider adapters in `src/jobfinder/providers/` and registered in
-`src/jobfinder/providers/registry.py`; the profile does not need a separate
+`src/jobfinder/providers/registry.py`; the product does not need a separate
 scraper engine.
-

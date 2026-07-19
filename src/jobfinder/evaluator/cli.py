@@ -44,9 +44,11 @@ def build_arg_parser(env: EnvSettings | None = None) -> argparse.ArgumentParser:
         description="Evaluate job postings with OpenAI and update the same sheet."
     )
     parser.add_argument(
+        "--product",
         "--profile",
+        dest="profile",
         choices=("jobs", "phd"),
-        help="Use the standard JobFinder profile or the academic PhDFinder profile.",
+        help="Select JobFinder or PhDFinder; --profile is a compatibility alias.",
     )
     parser.add_argument(
         "--source",

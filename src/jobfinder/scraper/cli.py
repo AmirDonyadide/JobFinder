@@ -42,9 +42,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument(
+        "--product",
         "--profile",
+        dest="profile",
         choices=("jobs", "phd"),
-        help="Use the standard JobFinder profile or the academic PhDFinder profile.",
+        help="Select JobFinder or PhDFinder; --profile is a compatibility alias.",
     )
     return parser
 

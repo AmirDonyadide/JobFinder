@@ -25,7 +25,7 @@ from jobfinder.integrations.google.sheets import (
     build_google_sheets_service,
     quote_sheet_name,
 )
-from jobfinder.profiles import FinderProfile, profile_spreadsheet_id
+from jobfinder.products import FinderProduct, product_spreadsheet_id
 
 LABEL_SEPARATOR_RE = re.compile(r"[;\n]+")
 LIST_MARKER_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s*")
@@ -232,11 +232,11 @@ def read_google_spreadsheet_id(
     cli_value: str,
     *,
     env: EnvSettings | None = None,
-    profile: str | FinderProfile | None = None,
+    profile: str | FinderProduct | None = None,
 ) -> str:
     """Resolve a spreadsheet ID from CLI, env, or local cache file."""
     settings = env or EnvSettings()
-    return profile_spreadsheet_id(settings, profile, explicit=cli_value)
+    return product_spreadsheet_id(settings, profile, explicit=cli_value)
 
 
 def read_google_input(

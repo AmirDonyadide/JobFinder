@@ -1,0 +1,11 @@
+# Academic role search terms for PhDFinder.
+# Copy this file to products/phdfinder/config/keywords.txt and adjust it for your field.
+
+PhD position
+Doctoral researcher
+Doctoral candidate
+Research assistant
+Research associate
+Wissenschaftliche Mitarbeiter
+Doktorand
+Promotionsstelle

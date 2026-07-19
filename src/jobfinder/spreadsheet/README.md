@@ -25,7 +25,7 @@ env PYTHONPATH=src python -c "from jobfinder.spreadsheet.schema import SCRAPER_O
 Run schema-sensitive tests:
 
 ```bash
-python -m pytest tests/test_scraper_export_rows.py tests/test_evaluator_parsing.py tests/test_evaluator_storage.py
+python -m pytest tests/scraper/test_export_rows.py tests/evaluator/test_parsing.py tests/evaluator/test_storage.py
 ```
 
 ## Column Sets

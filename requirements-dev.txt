@@ -1,6 +1,0 @@
--r requirements-scraper.txt
-
-black>=26.5.1,<27
-mypy>=1.17,<2
-pytest>=9.1.1,<10
-ruff>=0.15.20,<1

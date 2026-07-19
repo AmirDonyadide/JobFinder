@@ -17,13 +17,13 @@ scraper, dedupe, and exporters.
 Run provider tests without external services:
 
 ```bash
-python -m pytest tests/test_indeed_provider.py tests/test_stepstone_provider.py tests/test_xing_provider.py tests/test_scraper_search.py
+python -m pytest tests/providers tests/scraper/test_search.py
 ```
 
-Run one provider locally after configuring `.env` and `configs/keywords.txt`:
+Run one provider locally after configuring `.env` and `products/jobfinder/config/keywords.txt`:
 
 ```bash
-JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=indeed python linkedin_job_scraper.py
+JOBFINDER_SCRAPER_OUTPUT_MODE=excel JOBFINDER_SCRAPER_SOURCES=indeed jobfinder-scrape
 ```
 
 ## Current Providers
@@ -112,7 +112,7 @@ than code:
 | Need | Change |
 |---|---|
 | Source mix | `JOBFINDER_SCRAPER_SOURCES`. |
-| LinkedIn geography | `configs/filters.json` `linkedin_search.location` and `geo_id`. |
+| LinkedIn geography | `products/jobfinder/config/filters.json` `linkedin_search.location` and `geo_id`. |
 | Indeed geography | `INDEED_COUNTRY` and `INDEED_LOCATION`. |
 | Stepstone geography or direct URL mode | `STEPSTONE_LOCATION` or `STEPSTONE_START_URLS`. |
 | Xing geography or direct URL mode | `XING_LOCATION`, `XING_DATE_POSTED`, or `XING_START_URL`. |

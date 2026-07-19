@@ -34,10 +34,10 @@ These commands bypass dedupe, spreadsheet history, and final business filters.
 They print a small redacted raw sample and then check the provider parser:
 
 ```bash
-python scripts/test_linkedin_scraper.py
-python scripts/test_indeed_scraper.py
-python scripts/test_stepstone_scraper.py
-python scripts/test_xing_scraper.py
+python scripts/smoke_linkedin.py
+python scripts/smoke_indeed.py
+python scripts/smoke_stepstone.py
+python scripts/smoke_xing.py
 ```
 
 All default to `GIS`, `Germany`, and 10 items. Use `--raw-only` to skip parser

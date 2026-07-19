@@ -24,14 +24,12 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-          cache-dependency-path: |
-            requirements-scraper.txt
-            requirements-dev.txt
+          cache-dependency-path: pyproject.toml
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements-dev.txt
+          python -m pip install -e ".[all,dev]"
 
       - name: Lint
         run: python -m ruff check .
@@ -43,19 +41,19 @@ jobs:
         run: python -m mypy src
 
       - name: Compile Python files
-        run: python -m compileall src tests scripts run_job_pipeline.py phd_finder.py linkedin_job_scraper.py job_fit_evaluator.py job_scraper_config.py
+        run: python -m compileall src tests scripts
 
       - name: Smoke-test CLIs
         run: |
-          PYTHONPATH=src python -m jobfinder.pipeline.cli --help
-          PYTHONPATH=src python -m jobfinder.scraper.cli --help
-          PYTHONPATH=src python -m jobfinder.evaluator.cli --help
-          python phd_finder.py --help
+          jobfinder --help
+          phdfinder --help
+          jobfinder-scrape --help
+          jobfinder-evaluate --help
 
       - name: Validate JSON config
         run: |
-          python -m json.tool configs/filters.json
-          python -m json.tool profiles/phd/filters.json
+          python -m json.tool products/jobfinder/config/filters.json
+          python -m json.tool products/phdfinder/config/filters.json
 
       - name: Test
         run: python -m pytest

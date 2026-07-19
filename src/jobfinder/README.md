@@ -1,15 +1,8 @@
 # `jobfinder` Package
 
-This package contains the production implementation behind the root
-compatibility scripts:
-
-- `run_job_pipeline.py`
-- `linkedin_job_scraper.py`
-- `job_fit_evaluator.py`
-- `job_scraper_config.py`
-
-New code should import from `jobfinder.*`. The root scripts exist to preserve
-older local commands and to make the package usable before an editable install.
+This package is the shared production engine behind JobFinder and PhDFinder.
+Product-owned inputs live under `products/`; reusable behavior lives here.
+New code should import from `jobfinder.*`.
 
 ## Table Of Contents
 
@@ -27,8 +20,7 @@ older local commands and to make the package usable before an editable install.
 ## Prerequisites
 
 - Python 3.14 or newer.
-- Runtime dependencies installed with `python -m pip install -e .` or
-  `python -m pip install -r requirements.txt`.
+- Runtime dependencies installed with `python -m pip install -e ".[all]"`.
 - Private files and credentials only for commands that actually scrape,
   evaluate, or touch Google APIs.
 
@@ -37,16 +29,15 @@ older local commands and to make the package usable before an editable install.
 From the repository root:
 
 ```bash
-python -m pip install -e .
+python -m pip install -e ".[all]"
 jobfinder-pipeline --help
 jobfinder-scrape --help
 jobfinder-evaluate --help
 ```
 
-Without installing the package, use the root wrappers or set `PYTHONPATH`:
+Without installing the package, set `PYTHONPATH` for direct module execution:
 
 ```bash
-python run_job_pipeline.py --help
 env PYTHONPATH=src python -m jobfinder.pipeline.cli --help
 ```
 
@@ -57,19 +48,20 @@ code:
 
 | Need | Start with |
 |---|---|
-| Search terms | `configs/keywords.txt` or `JOB_KEYWORDS_TEXT`. |
-| Search geography and filters | `configs/filters.json` plus provider env vars. |
-| Runtime mode, secrets, and tuning | `.env` locally or `.github/workflows/jobs.yml` in Actions. |
-| Prompt and CV behavior | `prompts/master_prompt.txt`, `cv/master_cv.tex`, and evaluator settings. |
+| Search terms | `products/jobfinder/config/keywords.txt` or `JOB_KEYWORDS_TEXT`. |
+| Search geography and filters | `products/jobfinder/config/filters.json` plus provider env vars. |
+| Runtime mode, secrets, and tuning | `.env` locally or `.github/workflows/jobfinder.yml` in Actions. |
+| Prompt and CV behavior | `products/jobfinder/evaluator/master_prompt.txt`, `products/jobfinder/evaluator/master_cv.tex`, and evaluator settings. |
 | New provider or output columns | Package modules listed in [Extension Points](#extension-points). |
 
-Keep compatibility wrappers thin. New behavior belongs under `src/jobfinder`.
+Keep compatibility import facades thin. New behavior belongs in the canonical
+modules under `src/jobfinder`.
 
 ## Package Map
 
 | Path | Responsibility |
 |---|---|
-| `config_files.py` | Loads `configs/keywords.txt` and `configs/filters.json` and provides typed config helpers. |
+| `config_files.py` | Loads `products/jobfinder/config/keywords.txt` and `products/jobfinder/config/filters.json` and provides typed config helpers. |
 | `env.py` | Reads real environment variables with `.env` fallback. Real env values win. |
 | `paths.py` | Central repository-relative file paths. |
 | `core/` | Shared runtime helpers such as CLI logging setup. |
@@ -81,24 +73,25 @@ Keep compatibility wrappers thin. New behavior belongs under `src/jobfinder`.
 | `evaluator/` | OpenAI job-fit evaluation, CV PDF generation, parsing, storage adapters, and final cleanup. |
 | `pipeline/` | One-step scrape/evaluate CLI and preflight checks. |
 | `spreadsheet/` | Canonical spreadsheet column contracts shared by scraper and evaluator. |
-| `operations/` | Sanitized runtime report helpers for CI artifacts. |
+| `operations/` | Sanitized reports and shared CI runtime-file preparation. |
+| `products.py` | Canonical JobFinder/PhDFinder product definitions and isolated paths. |
+| `profiles.py` | Compatibility facade for historical profile imports. |
 
 ## Runtime Entry Points
 
-| Console script | Module | Root wrapper |
+| Console script | Module | Purpose |
 |---|---|---|
-| `jobfinder-pipeline` | `jobfinder.pipeline.cli:main` | `run_job_pipeline.py` |
-| `jobfinder-scrape` | `jobfinder.scraper.cli:main` | `linkedin_job_scraper.py` |
-| `jobfinder-evaluate` | `jobfinder.evaluator.cli:main` | `job_fit_evaluator.py` |
+| `jobfinder` / `jobfinder-pipeline` | `jobfinder.pipeline.cli:main` | Run JobFinder. |
+| `phdfinder` | `jobfinder.pipeline.cli:phd_main` | Run PhDFinder. |
+| `jobfinder-scrape` | `jobfinder.scraper.cli:main` | Run only the shared scraper. |
+| `jobfinder-evaluate` | `jobfinder.evaluator.cli:main` | Evaluate an existing output. |
 
-Without `python -m pip install -e .`, direct module execution requires:
+Without `python -m pip install -e ".[all]"`, direct module execution requires:
 
 ```bash
 env PYTHONPATH=src python -m jobfinder.pipeline.cli --help
 ```
 
-The root wrappers add `src` to `sys.path` themselves, so they work from a fresh
-clone as long as dependencies are installed.
 
 ## Architecture Boundaries
 
@@ -150,15 +143,15 @@ Common changes and where they belong:
 |---|---|
 | Add a provider | `providers/`, `scraper/search.py`, `scraper/settings.py`, provider tests. |
 | Change output columns | `spreadsheet/schema.py`, exporters, evaluator parsing/storage, docs, tests. |
-| Tune dedupe identity | `dedupe/normalize.py`, `dedupe/scoring.py`, `dedupe/matching.py`, `tests/test_dedupe_matching.py`. |
+| Tune dedupe identity | `dedupe/normalize.py`, `dedupe/scoring.py`, `dedupe/matching.py`, `tests/dedupe/test_matching.py`. |
 | Change evaluator output parsing | `evaluator/parsing.py`, `evaluator/models.py`, evaluator tests. |
-| Change production scheduling | `.github/workflows/jobs.yml` and `.github/workflows/README.md`. |
+| Change production scheduling | `.github/workflows/jobfinder.yml` and `.github/workflows/README.md`. |
 
 ## Troubleshooting
 
 | Problem | What to check |
 |---|---|
-| `No module named 'jobfinder'` | Run from the repository root, install with `python -m pip install -e .`, or set `PYTHONPATH=src`. |
+| `No module named 'jobfinder'` | Run from the repository root, install with `python -m pip install -e ".[all]"`, or set `PYTHONPATH=src`. |
 | Console script is missing | Reinstall the editable package after changing `pyproject.toml`. |
 | A compatibility import behaves differently | Compare the facade module with the stable `jobfinder.*` implementation it re-exports. |
 | A column change breaks evaluator output | Update `spreadsheet/schema.py`, exporter/evaluator code, tests, and READMEs together. |

@@ -7,8 +7,14 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 """Absolute path to the repository root."""
 
-CONFIG_DIR = PROJECT_ROOT / "configs"
-"""Directory containing user-editable scraper configuration files."""
+PRODUCTS_DIR = PROJECT_ROOT / "products"
+"""Directory containing the two product-specific configurations."""
+
+JOBFINDER_PRODUCT_DIR = PRODUCTS_DIR / "jobfinder"
+"""JobFinder product configuration and evaluator assets."""
+
+CONFIG_DIR = JOBFINDER_PRODUCT_DIR / "config"
+"""JobFinder user-editable scraper configuration files."""
 
 ENV_FILE = PROJECT_ROOT / ".env"
 """Local environment file loaded after real environment variables."""
@@ -16,13 +22,13 @@ ENV_FILE = PROJECT_ROOT / ".env"
 DEFAULT_EXCEL_FILE = PROJECT_ROOT / "jobs.xlsx"
 """Default local Excel workbook output path."""
 
-DEFAULT_MASTER_PROMPT_FILE = PROJECT_ROOT / "prompts" / "master_prompt.txt"
+DEFAULT_MASTER_PROMPT_FILE = JOBFINDER_PRODUCT_DIR / "evaluator" / "master_prompt.txt"
 """Default master prompt used by the job-fit evaluator."""
 
-DEFAULT_CV_FILE = PROJECT_ROOT / "cv" / "master_cv.tex"
+DEFAULT_CV_FILE = JOBFINDER_PRODUCT_DIR / "evaluator" / "master_cv.tex"
 """Default LaTeX CV injected into evaluator prompts."""
 
-DEFAULT_CV_PHOTO_FILE = PROJECT_ROOT / "cv" / "photo.png"
+DEFAULT_CV_PHOTO_FILE = JOBFINDER_PRODUCT_DIR / "evaluator" / "photo.png"
 """Default optional CV photo copied into LaTeX compilation directories."""
 
 GOOGLE_CLIENT_SECRET_FILE = PROJECT_ROOT / "google_client_secret.json"

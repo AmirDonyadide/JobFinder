@@ -1,0 +1,437 @@
+name: JobFinder Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Job sources to scrape"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - linkedin
+          - indeed
+          - stepstone
+          - xing
+          - all
+      posted_time_window:
+        description: "Provider posted-time window"
+        required: true
+        default: "since_previous_run"
+        type: choice
+        options:
+          - since_previous_run
+          - last_24h
+          - last_7d
+          - backfill
+      max_applicants:
+        description: "Maximum applicants per job"
+        required: true
+        default: "50"
+        type: choice
+        options:
+          - "50"
+          - "100"
+          - "200"
+          - no_limit
+      run_mode:
+        description: "Pipeline mode"
+        required: true
+        default: "scrape_and_evaluate"
+        type: choice
+        options:
+          - scrape_and_evaluate
+          - scrape_only
+      output_mode:
+        description: "Scraper output destination"
+        required: true
+        default: "google_sheets"
+        type: choice
+        options:
+          - google_sheets
+          - excel
+      cv_pdf_output:
+        description: "Generate tailored CV PDFs during evaluation"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      unsuitable_rows:
+        description: "Not-suitable rows in the final output"
+        required: true
+        default: "single_label_only"
+        type: choice
+        options:
+          - single_label_only
+          - keep_all
+
+  schedule:
+    # One automatic run per day at 10:27 Europe/Berlin time.
+    - cron: "27 10 * * *"
+      timezone: "Europe/Berlin"
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: jobfinder-pipeline
+  cancel-in-progress: false
+
+jobs:
+  daily-run-gate:
+    name: Check daily pipeline status
+    runs-on: ubuntu-latest
+    outputs:
+      run_pipeline: ${{ steps.daily-gate.outputs.run_pipeline }}
+
+    steps:
+      - name: Decide whether to run pipeline
+        id: daily-gate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_EVENT: ${{ github.event_name }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          TZ: Europe/Berlin
+        run: |
+          set -euo pipefail
+
+          if [ "${CURRENT_EVENT}" != "schedule" ]; then
+            echo "run_pipeline=true" >> "${GITHUB_OUTPUT}"
+            echo "Manual run; running pipeline."
+            exit 0
+          fi
+
+          bounds="$(
+            python3 - <<'PY'
+          from datetime import datetime, time, timezone
+          from zoneinfo import ZoneInfo
+
+          tz = ZoneInfo("Europe/Berlin")
+          today = datetime.now(tz).date()
+          start = datetime.combine(today, time.min, tzinfo=tz).astimezone(timezone.utc)
+          end = datetime.combine(today, time.max, tzinfo=tz).astimezone(timezone.utc)
+          print(
+              today.isoformat(),
+              start.isoformat().replace("+00:00", "Z"),
+              end.isoformat().replace("+00:00", "Z"),
+          )
+          PY
+          )"
+          read -r local_date utc_start utc_end <<< "${bounds}"
+
+          echo "Checking successful scheduled runs for ${local_date} (${TZ})."
+          echo "UTC window: ${utc_start} to ${utc_end}."
+
+          runs_file="${RUNNER_TEMP}/jobfinder-scheduled-runs.json"
+          if ! gh api \
+            --method GET \
+            "repos/${REPOSITORY}/actions/workflows/jobfinder.yml/runs" \
+            -f "event=schedule" \
+            -f "status=success" \
+            -f "created=>=${utc_start}" \
+            -f "per_page=100" \
+            > "${runs_file}"; then
+            echo "::warning::Could not inspect previous scheduled runs; running pipeline."
+            echo "run_pipeline=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          already_succeeded="$(
+            UTC_END="${utc_end}" python3 - "${runs_file}" <<'PY'
+          import json
+          import os
+          import sys
+          from datetime import datetime
+
+          current_run_id = int(os.environ["CURRENT_RUN_ID"])
+          utc_end = datetime.fromisoformat(os.environ["UTC_END"].replace("Z", "+00:00"))
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              runs = json.load(handle).get("workflow_runs", [])
+
+          for run in runs:
+              if int(run.get("id", 0)) == current_run_id:
+                  continue
+              if run.get("conclusion") != "success":
+                  continue
+              created_at = datetime.fromisoformat(
+                  run["created_at"].replace("Z", "+00:00")
+              )
+              if created_at <= utc_end:
+                  print("true")
+                  break
+          else:
+              print("false")
+          PY
+          )"
+
+          if [ "${already_succeeded}" = "true" ]; then
+            echo "A scheduled pipeline run already succeeded today; skipping this run."
+            echo "run_pipeline=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          echo "No successful scheduled pipeline run found today; running pipeline."
+          echo "run_pipeline=true" >> "${GITHUB_OUTPUT}"
+
+  scrape-and-evaluate:
+    name: Run JobFinder pipeline
+    needs: daily-run-gate
+    if: needs.daily-run-gate.outputs.run_pipeline == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    env:
+      APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+      GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
+      GOOGLE_DRIVE_TOKEN_JSON: ${{ secrets.GOOGLE_DRIVE_TOKEN_JSON }}
+      JOB_EVAL_CV_DRIVE_FOLDER_ID: ${{ secrets.JOB_EVAL_CV_DRIVE_FOLDER_ID }}
+      JOB_KEYWORDS_TEXT: ${{ secrets.JOB_KEYWORDS_TEXT }}
+      MASTER_PROMPT_TEXT: ${{ secrets.MASTER_PROMPT_TEXT }}
+      MASTER_CV_TEX: ${{ secrets.MASTER_CV_TEX }}
+      CV_PHOTO_BASE64: ${{ secrets.CV_PHOTO_BASE64 }}
+      JOBFINDER_SCRAPER_OUTPUT_MODE: ${{ github.event.inputs.output_mode || 'google_sheets' }}
+      JOBFINDER_SCRAPER_SOURCES: ${{ github.event.inputs.sources || 'all' }}
+      JOBFINDER_PIPELINE_MODE: ${{ github.event.inputs.run_mode || 'scrape_and_evaluate' }}
+      JOBFINDER_PIPELINE_RESUME_INCOMPLETE: "true"
+      JOBFINDER_SCRAPER_POSTED_TIME_WINDOW: ${{ github.event.inputs.posted_time_window || 'since_previous_run' }}
+      JOBFINDER_SCRAPER_MAX_APPLICANTS: ${{ github.event.inputs.max_applicants == 'no_limit' && '0' || github.event.inputs.max_applicants || '50' }}
+      JOBFINDER_SCRAPER_SEARCH_CONCURRENCY: "15"
+      JOBFINDER_SCRAPER_SEARCH_WINDOW_BUFFER_SECONDS: "3600"
+      APIFY_RUN_MEMORY_MB: "0"
+      APIFY_RUN_TIMEOUT_SECONDS: "3600"
+      APIFY_CLIENT_TIMEOUT_SECONDS: "120"
+      APIFY_TRANSIENT_ERROR_RETRIES: "5"
+      APIFY_RETRY_DELAY_SECONDS: "30"
+      GOOGLE_API_TIMEOUT_SECONDS: "120"
+      GOOGLE_API_RETRIES: "3"
+      JOBFINDER_PIPELINE_STEP_TIMEOUT_SECONDS: "21000"
+      JOBFINDER_SCRAPER_DELAY_BETWEEN_REQUESTS: "0"
+      JOBFINDER_SCRAPER_SCRAPE_COMPANY_DETAILS: "false"
+      INDEED_COUNTRY: "DE"
+      INDEED_LOCATION: "Germany"
+      STEPSTONE_LOCATION: "Germany"
+      STEPSTONE_MAX_CONCURRENCY: "10"
+      STEPSTONE_MAX_REQUEST_RETRIES: "3"
+      XING_LOCATION: "Germany"
+      XING_DATE_POSTED: ""
+      XING_MAX_PAGES: "20"
+      XING_MAX_CONCURRENCY: "5"
+      JOBFINDER_SCRAPER_TIMEZONE: Europe/Berlin
+      JOBFINDER_SCRAPER_POSTED_TIMEZONE: Europe/Berlin
+      JOB_EVAL_OPENAI_MODEL: "gpt-5-mini"
+      JOB_EVAL_CONCURRENCY: "8"
+      JOB_EVAL_BATCH_SIZE: "40"
+      JOB_EVAL_CV_PHOTO_FILE: products/jobfinder/evaluator/photo.png
+      JOB_EVAL_CV_MAX_PAGES: "2"
+      JOB_EVAL_CV_PDF_OUTPUT: ${{ github.event.inputs.cv_pdf_output || 'true' }}
+      JOB_EVAL_CV_PDF_APPLICANT_NAME: "Amir Donyadide"
+      JOB_EVAL_CV_PDF_TIMEOUT: "120"
+      JOB_EVAL_LARGE_QUEUE_THRESHOLD: "200"
+      JOB_EVAL_LARGE_QUEUE_SLEEP_MS: "2000"
+      JOB_EVAL_UNSUITABLE_ROW_POLICY: ${{ github.event.inputs.unsuitable_rows || 'single_label_only' }}
+      JOBFINDER_PIPELINE_REPORT_FILE: reports/pipeline_preflight.json
+      JOBFINDER_SCRAPER_REPORT_FILE: reports/scraper.json
+      JOBFINDER_EVALUATOR_REPORT_FILE: reports/evaluator.json
+      PYTHONUNBUFFERED: "1"
+      TZ: Europe/Berlin
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Resolve workflow plan
+        id: workflow_plan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          should_evaluate=false
+          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ]; then
+            should_evaluate=true
+          fi
+
+          needs_google=false
+          if [ "${should_evaluate}" = "true" ] || [ "${JOBFINDER_SCRAPER_OUTPUT_MODE}" = "google_sheets" ]; then
+            needs_google=true
+          fi
+
+          needs_latex=false
+          if [ "${should_evaluate}" = "true" ] && [ "${JOB_EVAL_CV_PDF_OUTPUT}" = "true" ]; then
+            needs_latex=true
+          fi
+
+          direct_scraper=false
+          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_only" ] && [ "${JOBFINDER_SCRAPER_OUTPUT_MODE}" = "excel" ]; then
+            direct_scraper=true
+          fi
+
+          echo "should_evaluate=${should_evaluate}" >> "${GITHUB_OUTPUT}"
+          echo "needs_google=${needs_google}" >> "${GITHUB_OUTPUT}"
+          echo "needs_latex=${needs_latex}" >> "${GITHUB_OUTPUT}"
+          echo "direct_scraper=${direct_scraper}" >> "${GITHUB_OUTPUT}"
+
+          echo "Workflow plan:"
+          echo "- pipeline mode: ${JOBFINDER_PIPELINE_MODE}"
+          echo "- scraper output mode: ${JOBFINDER_SCRAPER_OUTPUT_MODE}"
+          echo "- evaluator enabled: ${should_evaluate}"
+          echo "- Google Sheets/Drive setup needed: ${needs_google}"
+          echo "- LaTeX setup needed: ${needs_latex}"
+          echo "- direct scraper CLI: ${direct_scraper}"
+          echo "- selected sources: ${JOBFINDER_SCRAPER_SOURCES}"
+
+          for source in linkedin indeed stepstone xing; do
+            if [ "${JOBFINDER_SCRAPER_SOURCES}" = "all" ] || [ "${JOBFINDER_SCRAPER_SOURCES}" = "${source}" ]; then
+              echo "- ${source}: enabled"
+            else
+              echo "- ${source}: skipped"
+            fi
+          done
+
+      - name: Install scraper dependencies
+        run: python -m pip install -e ".[scraper]"
+
+      - name: Install evaluator dependencies
+        if: steps.workflow_plan.outputs.should_evaluate == 'true'
+        run: python -m pip install -e ".[evaluator]"
+
+      - name: Install Google API dependencies
+        if: steps.workflow_plan.outputs.needs_google == 'true'
+        run: python -m pip install -e ".[google]"
+
+      - name: Install LaTeX tools
+        if: steps.workflow_plan.outputs.needs_latex == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y latexmk texlive-xetex texlive-latex-extra
+
+      - name: Validate secrets and prepare private runtime files
+        shell: bash
+        run: PYTHONPATH=src python -m jobfinder.operations.runtime_files prepare
+
+      - name: Preflight provider and Google access
+        if: steps.workflow_plan.outputs.direct_scraper != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          jobfinder --mode "${JOBFINDER_PIPELINE_MODE}" --preflight
+
+      - name: Run selected JobFinder workflow
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p reports
+
+          echo "Starting JobFinder Pipeline at $(date +'%Y-%m-%dT%H:%M:%S%z') (${TZ})"
+          echo "Output mode: ${JOBFINDER_SCRAPER_OUTPUT_MODE}"
+          echo "Pipeline mode: ${JOBFINDER_PIPELINE_MODE}"
+          echo "Resume incomplete evaluation: ${JOBFINDER_PIPELINE_RESUME_INCOMPLETE}"
+          echo "Job sources: ${JOBFINDER_SCRAPER_SOURCES}"
+          echo "Posted-time window: ${JOBFINDER_SCRAPER_POSTED_TIME_WINDOW}"
+          if [ "${JOBFINDER_SCRAPER_MAX_APPLICANTS}" = "0" ]; then
+            echo "Max applicants/job: no limit"
+          else
+            echo "Max applicants/job: ${JOBFINDER_SCRAPER_MAX_APPLICANTS}"
+          fi
+          echo "Scraper timezone: ${JOBFINDER_SCRAPER_TIMEZONE}"
+          echo "Posted timezone: ${JOBFINDER_SCRAPER_POSTED_TIMEZONE}"
+          echo "Search concurrency: ${JOBFINDER_SCRAPER_SEARCH_CONCURRENCY}"
+          echo "Search window buffer: ${JOBFINDER_SCRAPER_SEARCH_WINDOW_BUFFER_SECONDS}s"
+          if [ "${APIFY_RUN_MEMORY_MB}" = "0" ]; then
+            echo "Apify child run memory: actor default"
+          else
+            echo "Apify child run memory override: ${APIFY_RUN_MEMORY_MB} MB"
+          fi
+          echo "Apify child run timeout: ${APIFY_RUN_TIMEOUT_SECONDS}s"
+          echo "Apify HTTP request timeout: ${APIFY_CLIENT_TIMEOUT_SECONDS}s"
+          echo "Apify transient error retries: ${APIFY_TRANSIENT_ERROR_RETRIES}"
+          echo "Apify retry base delay: ${APIFY_RETRY_DELAY_SECONDS}s"
+          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ]; then
+            echo "Evaluator: enabled"
+            echo "Evaluator model: ${JOB_EVAL_OPENAI_MODEL}"
+            echo "Evaluator concurrency: ${JOB_EVAL_CONCURRENCY}"
+            echo "CV PDF output: ${JOB_EVAL_CV_PDF_OUTPUT}"
+          else
+            echo "Evaluator: skipped"
+            echo "CV PDF output: skipped"
+          fi
+          echo "Unsuitable row policy: ${JOB_EVAL_UNSUITABLE_ROW_POLICY}"
+
+          if [ "${JOBFINDER_PIPELINE_MODE}" = "scrape_only" ] && [ "${JOBFINDER_SCRAPER_OUTPUT_MODE}" = "excel" ]; then
+            echo "Running direct scraper CLI for Excel output."
+            jobfinder-scrape 2>&1 | tee pipeline.log
+            status=${PIPESTATUS[0]}
+          else
+            echo "Running pipeline CLI."
+            jobfinder --mode "${JOBFINDER_PIPELINE_MODE}" 2>&1 | tee pipeline.log
+            status=${PIPESTATUS[0]}
+          fi
+
+          {
+            echo "# JobFinder Run Summary"
+            echo
+            echo "- Status: $([ "$status" -eq 0 ] && echo succeeded || echo failed)"
+            echo "- Pipeline mode: ${JOBFINDER_PIPELINE_MODE}"
+            echo "- Scraper output mode: ${JOBFINDER_SCRAPER_OUTPUT_MODE}"
+            echo "- Resume incomplete evaluation: ${JOBFINDER_PIPELINE_RESUME_INCOMPLETE}"
+            echo "- Job sources: ${JOBFINDER_SCRAPER_SOURCES}"
+            echo "- Posted-time window: ${JOBFINDER_SCRAPER_POSTED_TIME_WINDOW}"
+            echo "- Max applicants/job: $([ "${JOBFINDER_SCRAPER_MAX_APPLICANTS}" = "0" ] && echo "no limit" || echo "${JOBFINDER_SCRAPER_MAX_APPLICANTS}")"
+            echo "- Evaluator: $([ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ] && echo enabled || echo skipped)"
+            echo "- CV PDF output: $([ "${JOBFINDER_PIPELINE_MODE}" = "scrape_and_evaluate" ] && echo "${JOB_EVAL_CV_PDF_OUTPUT}" || echo skipped)"
+            echo "- Unsuitable row policy: ${JOB_EVAL_UNSUITABLE_ROW_POLICY}"
+            echo "- Started at: $(date +'%Y-%m-%dT%H:%M:%S%z')"
+            echo "- GitHub run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } > reports/workflow_summary.md
+
+          if [ "$status" -ne 0 ]; then
+            echo "::error::jobfinder failed with exit code ${status}."
+            exit "$status"
+          fi
+
+          echo "Pipeline finished successfully."
+
+      - name: Upload run reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jobfinder-run-reports
+          path: |
+            reports/*.json
+            reports/*.md
+          if-no-files-found: ignore
+
+      - name: Upload Excel output
+        if: always() && env.JOBFINDER_SCRAPER_OUTPUT_MODE == 'excel'
+        uses: actions/upload-artifact@v7
+        with:
+          name: jobfinder-excel-output
+          path: jobs.xlsx
+          if-no-files-found: ignore
+
+      - name: Remove private runtime files
+        if: always()
+        shell: bash
+        run: |
+          PYTHONPATH=src python -m jobfinder.operations.runtime_files cleanup
+          rm -f \
+            jobs.xlsx \
+            pipeline.log
+          rm -rf reports

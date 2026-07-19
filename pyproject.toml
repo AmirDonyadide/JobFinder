@@ -5,10 +5,29 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jobfinder"
 version = "0.1.0"
-description = "Apify-powered job scraping and OpenAI job-fit evaluation pipeline."
+description = "Shared search and evaluation engine for JobFinder and PhDFinder."
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = [
+dependencies = []
+
+[project.optional-dependencies]
+scraper = [
+    "openpyxl>=3.1,<4",
+    "requests>=2.31,<3",
+    "tzdata>=2024.1",
+]
+evaluator = [
+    "openpyxl>=3.1,<4",
+    "openai>=1.93,<3",
+    "tzdata>=2024.1",
+]
+google = [
+    "google-api-python-client>=2.100,<3",
+    "google-auth>=2.20,<3",
+    "google-auth-httplib2>=0.2,<1",
+    "google-auth-oauthlib>=1.2,<2",
+]
+all = [
     "openpyxl>=3.1,<4",
     "openai>=1.93,<3",
     "requests>=2.31,<3",
@@ -18,8 +37,14 @@ dependencies = [
     "google-auth-httplib2>=0.2,<1",
     "google-auth-oauthlib>=1.2,<2",
 ]
+dev = [
+    "mypy>=1.17,<3",
+    "pytest>=9.1.1,<10",
+    "ruff>=0.15.20,<1",
+]
 
 [project.scripts]
+jobfinder = "jobfinder.pipeline.cli:main"
 jobfinder-scrape = "jobfinder.scraper.cli:main"
 jobfinder-evaluate = "jobfinder.evaluator.cli:main"
 jobfinder-pipeline = "jobfinder.pipeline.cli:main"
