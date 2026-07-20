@@ -109,10 +109,11 @@ def test_prepare_rejects_google_token_missing_drive_scope(tmp_path):
         )
 
 
-def test_prepare_is_ci_only_by_default(tmp_path):
+def test_prepare_is_ci_only_by_default(tmp_path, monkeypatch):
     product = temporary_product(tmp_path)
     values = dict(complete_env().local_values)
     values.pop("GITHUB_ACTIONS")
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
 
     with pytest.raises(RuntimeFileError, match="restricted to GitHub Actions"):
         prepare_runtime_files(
