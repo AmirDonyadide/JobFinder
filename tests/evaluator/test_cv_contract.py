@@ -199,9 +199,8 @@ def test_english_contract_enforces_and_trims_phdfinder_cv():
         without_project,
         contract=ENGLISH_CV_CONTRACT,
     )
-    assert len(
-        project_entries(without_project, contract=ENGLISH_CV_CONTRACT)[1]
-    ) == 2
-    assert len(
-        experience_entries(without_experience, contract=ENGLISH_CV_CONTRACT)[1]
-    ) == 1
+    assert len(project_entries(without_project, contract=ENGLISH_CV_CONTRACT)[1]) == 2
+    assert (
+        len(experience_entries(without_experience, contract=ENGLISH_CV_CONTRACT)[1])
+        == 1
+    )
