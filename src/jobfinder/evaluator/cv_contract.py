@@ -277,8 +277,7 @@ def _protected_education(
     if all(pools):
         if len(generated_lines) != 2:
             raise EvaluationError(
-                "Tailored CV must contain exactly two "
-                f"{contract.course_label} lines."
+                f"Tailored CV must contain exactly two {contract.course_label} lines."
             )
         msc_value = _validated_course_value(
             generated_lines[0].group("value"), pools[0], "MSc"
@@ -404,9 +403,7 @@ def enforce_master_cv_contract(
         )
     language_section = extract_section(master_latex, contract.languages_section)
     if language_section:
-        updated = replace_section(
-            updated, contract.languages_section, language_section
-        )
+        updated = replace_section(updated, contract.languages_section, language_section)
     _validate_experience(updated, master_latex, contract)
     if "\\end{document}" not in updated:
         raise EvaluationError("Tailored CV is missing \\end{document}.")
