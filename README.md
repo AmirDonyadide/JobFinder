@@ -111,8 +111,7 @@ and private CVs are ignored by Git. Do not commit them.
 
 ## GitHub Actions
 
-- **JobFinder Pipeline** runs manually or on its configured daily schedule.
-- **PhDFinder Pipeline** is manual-only until its separate schedule is enabled.
+- **JobFinder Pipeline** and **PhDFinder Pipeline** are both manual-only.
 - Both use the same tested CI runtime-file preparation code while keeping
   secrets, reports, artifacts, spreadsheet IDs, and concurrency groups separate.
 

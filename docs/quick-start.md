@@ -52,8 +52,8 @@ Results appear in the configured Google spreadsheet. GitHub also uploads a
 product-specific report artifact. Inspect that artifact whenever output is
 empty or unexpectedly sparse.
 
-JobFinder has a daily schedule. PhDFinder is manual-only by default to avoid
-unplanned Apify or OpenAI cost.
+JobFinder and PhDFinder are both manual-only to avoid unplanned Apify or OpenAI
+cost.
 
 For OAuth creation, exact secret commands, schedules, and troubleshooting, see
 [Run with GitHub Actions](run-github-actions.md).
