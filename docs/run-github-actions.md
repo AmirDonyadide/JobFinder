@@ -8,7 +8,7 @@ reports, and outputs.
 
 | Workflow | Use it for | Default trigger |
 |---|---|---|
-| **JobFinder Pipeline** (`jobfinder.yml`) | General jobs | Manual or daily schedule |
+| **JobFinder Pipeline** (`jobfinder.yml`) | General jobs | Manual only |
 | **PhDFinder Pipeline** (`phd.yml`) | PhD and academic roles | Manual only |
 
 PhDFinder reads secrets from a GitHub Environment named `phdfinder`. JobFinder
@@ -89,9 +89,9 @@ Use `scrape_only` while validating providers or filters. Use
 
 ## Schedules and cost
 
-JobFinder's schedule is declared in `.github/workflows/jobfinder.yml`.
-PhDFinder is deliberately manual-only. Add a PhDFinder schedule only after a
-successful manual run establishes acceptable Apify and OpenAI cost.
+JobFinder and PhDFinder are both manual-only. Neither workflow has a scheduled
+trigger, preventing unplanned Apify and OpenAI usage. Add a schedule only after
+a successful manual run establishes acceptable recurring cost.
 
 Disabling one workflow does not disable the other.
 
@@ -131,7 +131,6 @@ warnings or zero-result actor runs.
 | Wrong spreadsheet | Verify the product-specific `GOOGLE_SPREADSHEET_ID`. |
 | No jobs | Inspect report artifacts, actor logs, date window, filters, and Apify quota. |
 | PDF generation fails | Check the Master CV, LaTeX tools, Drive folder ID, and optional photo. |
-| Duplicate scheduled runs | Check the JobFinder daily-run gate and its product-specific concurrency group. |
 
 See the [workflow reference](../.github/workflows/README.md) and general
 [troubleshooting guide](troubleshooting.md).

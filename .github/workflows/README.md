@@ -5,7 +5,7 @@ The repository has one quality workflow and two isolated product workflows.
 | Workflow | Product | Trigger | State boundary |
 |---|---|---|---|
 | `ci.yml` | Shared engine and both products | Push and pull request | No live credentials or network calls |
-| `jobfinder.yml` | JobFinder | Manual and daily schedule | Repository secrets, JobFinder spreadsheet/history/reports |
+| `jobfinder.yml` | JobFinder | Manual only | Repository secrets, JobFinder spreadsheet/history/reports |
 | `phd.yml` | PhDFinder | Manual only | `phdfinder` environment, PhDFinder spreadsheet/history/reports |
 
 ## Shared behavior
@@ -33,7 +33,7 @@ Secret values are never printed.
 |---|---|---|
 | Internal key | `jobs` | `phd` |
 | Workflow environment | Repository secrets | GitHub Environment `phdfinder` |
-| Schedule | Daily plus manual | Manual only by default |
+| Schedule | Manual only | Manual only |
 | Applicant cap | Workflow input | Disabled by default |
 | Default posted window | Since previous run | Last seven days |
 | Unsuitable-row policy | Workflow input | Keep all |
@@ -83,9 +83,9 @@ primary boundary between workflow success and actual data success.
 
 ## Safe changes
 
-- Change schedules only in the matching product workflow.
+- Keep both product workflows manual-only unless recurring cost is deliberately
+  accepted and documented.
 - Keep concurrency groups and artifact names product-specific.
 - Put common secret-file behavior in `operations/runtime_files.py`, not copied
   inline Python blocks.
 - Validate both product filter JSON files in CI.
-- Keep PhDFinder manual-only until recurring Apify/OpenAI cost is accepted.
