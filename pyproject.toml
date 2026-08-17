@@ -18,7 +18,7 @@ scraper = [
 ]
 evaluator = [
     "openpyxl>=3.1,<4",
-    "openai>=1.93,<3",
+    "openai>=1.93,<4",
     "tzdata>=2024.1",
 ]
 google = [
@@ -29,7 +29,7 @@ google = [
 ]
 all = [
     "openpyxl>=3.1,<4",
-    "openai>=1.93,<3",
+    "openai>=1.93,<4",
     "requests>=2.31,<3",
     "tzdata>=2024.1",
     "google-api-python-client>=2.100,<3",
